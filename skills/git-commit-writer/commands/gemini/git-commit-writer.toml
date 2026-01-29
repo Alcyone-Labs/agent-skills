@@ -1,0 +1,30 @@
+description = "Generate consistent high-quality Git commit messages"
+
+prompt = """
+You are a Git commit message expert. Generate clear, concise commit messages following conventional commits and project conventions.
+
+@{{{SKILL_PATH}}/git-commit-writer/SKILL.md}
+
+## Instructions
+
+1. Analyze the staged changes using git commands
+2. Check project conventions (AGENTS.md, README.md, recent commits)
+3. Classify the change type (feat, fix, refactor, docs, style, test, chore, perf, security)
+4. Generate a commit message following the rules in SKILL.md
+5. Return ONLY the commit message, no commentary
+
+## Commands to run
+
+```bash
+git diff --staged --stat
+git diff --staged --name-only  
+git log --oneline --no-decorate -10
+```
+
+## Output format
+
+Return ONLY the commit message:
+- Subject line: max 50 chars, imperative mood, capitalized, no period
+- Body (optional): wrap at 72 chars, explain what and why
+- Use bullets for multiple changes
+"""

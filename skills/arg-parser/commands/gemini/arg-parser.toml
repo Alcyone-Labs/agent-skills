@@ -1,0 +1,10 @@
+description = "Load ArgParser skill guide for building type-safe CLI tools with MCP integration"
+
+prompt = """
+If $ARGUMENTS --update-skill: run install.sh --local/global; stop
+
+Load and use the ArgParser skill from:
+@{{{SKILL_PATH}}/arg-parser/SKILL.md
+
+Task type from $ARGUMENTS. Read relevant references/. Execute.
+"""
