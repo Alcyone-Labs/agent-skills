@@ -68,30 +68,9 @@ update_gitignore() {
 }
 
 # Check if we're in an interactive environment
-# Returns true if stdin is a terminal OR if we're in a test environment
+# Returns true if stdin is a terminal (user can provide input)
 is_interactive() {
-  # If stdin is a terminal, we're definitely interactive
-  [[ -t 0 ]] && return 0
-  
-  # Check if we're running in a test environment (BATS)
-  # BATS sets specific environment variables
-  [[ -n "${BATS_TEST_FILENAME:-}" ]] && return 0
-  
-  # Check if we're being run with input redirection for testing
-  # This detects if stdin is a pipe with actual data (not the script itself)
-  if [[ -p /dev/stdin ]]; then
-    # It's a pipe - check if there's data available
-    # We do this by trying to peek at the data without consuming it
-    local has_data
-    has_data=$(cat <&0 2>/dev/null | head -c 1 | wc -c)
-    if [[ "$has_data" -gt 0 ]]; then
-      # There's data in the pipe - likely test input
-      return 0
-    fi
-  fi
-  
-  # No input available and not a terminal - probably piped script
-  return 1
+  [[ -t 0 ]]
 }
 
 main() {
@@ -99,24 +78,26 @@ main() {
   local self_install=false
   local target_platforms=() # Default empty, interactive will set it or agents default
   local target_skills=()
+  local explicit_flags=false # Track if user provided explicit flags
 
   # 1. Parse Arguments
   while [[ $# -gt 0 ]]; do
     case "$1" in
-      -g|--global) install_type="global"; shift ;;
-      -l|--local) install_type="local"; shift ;;
-      -s|--self) self_install=true; shift ;;
+      -g|--global) install_type="global"; explicit_flags=true; shift ;;
+      -l|--local) install_type="local"; explicit_flags=true; shift ;;
+      -s|--self) self_install=true; explicit_flags=true; shift ;;
       -h|--help) usage; exit 0 ;;
-      --opencode) target_platforms+=("OpenCode"); shift ;;
-      --gemini) target_platforms+=("Gemini CLI"); shift ;;
-      --claude) target_platforms+=("Claude"); shift ;;
-      --droid) target_platforms+=("FactoryAI Droid"); shift ;;
-      --factory) target_platforms+=("FactoryAI Droid"); shift ;;
-      --agents) target_platforms+=("Agents"); shift ;;
-      --antigravity) target_platforms+=("Antigravity"); shift ;;
+      --opencode) target_platforms+=("OpenCode"); explicit_flags=true; shift ;;
+      --gemini) target_platforms+=("Gemini CLI"); explicit_flags=true; shift ;;
+      --claude) target_platforms+=("Claude"); explicit_flags=true; shift ;;
+      --droid) target_platforms+=("FactoryAI Droid"); explicit_flags=true; shift ;;
+      --factory) target_platforms+=("FactoryAI Droid"); explicit_flags=true; shift ;;
+      --agents) target_platforms+=("Agents"); explicit_flags=true; shift ;;
+      --antigravity) target_platforms+=("Antigravity"); explicit_flags=true; shift ;;
       --skill) 
         if [[ -n "${2:-}" ]]; then
           target_skills+=("$2")
+          explicit_flags=true
           shift 2
         else
           echo "Error: --skill requires a skill name"
@@ -126,6 +107,7 @@ main() {
       --all-skills) 
         # Mark to install all skills - will be populated after detecting available skills
         target_skills=("__ALL__")
+        explicit_flags=true
         shift
         ;;
       *) echo "Unknown option: $1"; usage; exit 1 ;;
@@ -154,25 +136,26 @@ main() {
   fi
 
   # 2. Interactive Logic
+  # If no explicit flags provided and we're not interactive, show error
+  if [[ "$explicit_flags" == false ]] && ! is_interactive; then
+    echo "Error: Interactive mode requires a terminal."
+    echo "When piping the script without explicit flags, you must specify platforms and installation type."
+    echo ""
+    echo "Examples:"
+    echo "  curl ... | bash -s -- --global --opencode"
+    echo "  curl ... | bash -s -- --local --opencode --gemini"
+    echo "  curl ... | bash -s -- --global --opencode --skill chrome-extension-architect"
+    echo ""
+    echo "Available platforms: --opencode, --gemini, --claude, --droid, --agents, --antigravity"
+    echo "Available skills: aquaria-cloudflare-ops, arg-parser, chrome-extension-architect, git-commit-writer, large-file-refactorer, skill-forge"
+    echo ""
+    echo "Use --skill NAME to install specific skills (can be used multiple times)"
+    echo "Use --all-skills to install all available skills"
+    exit 1
+  fi
+  
+  # If no install type or platforms specified, we need to go interactive
   if [[ "$install_type" == "interactive" ]] || [[ ${#target_platforms[@]} -eq 0 ]]; then
-    # Check if we're in a non-interactive environment (piped)
-    if ! is_interactive; then
-      echo "Error: Interactive mode requires a terminal."
-      echo "When piping the script, you must specify platforms and installation type explicitly."
-      echo ""
-      echo "Examples:"
-      echo "  curl ... | bash -s -- --global --opencode"
-      echo "  curl ... | bash -s -- --local --opencode --gemini"
-      echo "  curl ... | bash -s -- --global --opencode --skill chrome-extension-architect"
-      echo ""
-      echo "Available platforms: --opencode, --gemini, --claude, --droid, --agents, --antigravity"
-      echo "Available skills: aquaria-cloudflare-ops, arg-parser, chrome-extension-architect, git-commit-writer, large-file-refactorer, skill-forge"
-      echo ""
-      echo "Use --skill NAME to install specific skills (can be used multiple times)"
-      echo "Use --all-skills to install all available skills"
-      exit 1
-    fi
-    
     install_type="global" # Reset default for interactive flow
 
     # A. Select Scope
