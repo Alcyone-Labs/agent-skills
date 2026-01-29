@@ -128,7 +128,8 @@ skills/<skill-name>/
 ├── README.md                   # Skill-specific documentation
 ├── commands/                   # Platform-specific command definitions
 │   ├── opencode/<skill>.md    # OpenCode slash command
-│   └── gemini/<skill>.toml    # Gemini CLI command
+│   ├── gemini/<skill>.toml    # Gemini CLI command
+│   └── droid/<skill>.md       # FactoryAI Droid command
 └── references/                 # Reference documentation
     └── <topic>/
         └── README.md
@@ -167,8 +168,9 @@ agent-skills/
 │   ├── large-file-refactorer/
 │   └── skill-forge/
 ├── commands/              # Platform-specific command definitions
-│   ├── opencode/
-│   └── gemini/
+│   ├── opencode/          # OpenCode slash commands
+│   ├── gemini/            # Gemini CLI custom commands
+│   └── droid/             # FactoryAI Droid commands
 └── tests/                 # Test suite
 ```
 
@@ -187,9 +189,17 @@ MIT License - See individual skill directories for specific licensing details.
 
 ## Resources
 
+### Documentation
+
 - [AgentSkills.io](https://agentskills.io) - Skill development guidelines
 - [OpenCode Documentation](https://opencode.ai)
 - [Gemini CLI Documentation](https://ai.google.dev/gemini-api/docs)
+
+### Platform-Specific Command Documentation
+
+- [OpenCode Commands](https://opencode.ai/docs/commands) - Slash commands and skill loading
+- [Gemini CLI Custom Commands](https://geminicli.com/docs/cli/custom-commands/) - Creating and using custom commands with `{{args}}` injection
+- [FactoryAI Droid Documentation](https://docs.factory.ai/droid) - Droid commands and skill system
 
 ## Support
 

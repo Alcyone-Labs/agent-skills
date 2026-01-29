@@ -3,8 +3,12 @@ set -euo pipefail
 
 # === CONFIGURATION ===
 REPO_URL="https://github.com/Alcyone-Labs/agent-skills.git"
-# Default to directory name if PROJECT_NAME is not set
-PROJECT_NAME="${PROJECT_NAME:-$(basename "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)")}"
+# Default project name - use BASH_SOURCE if available, otherwise hardcoded default
+if [[ -n "${BASH_SOURCE[0]:-}" ]]; then
+  PROJECT_NAME="${PROJECT_NAME:-$(basename "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)")}"
+else
+  PROJECT_NAME="${PROJECT_NAME:-agent-skills}"
+fi
 # ======================
 
 # Helper to normalize platform name to folder name
@@ -86,6 +90,11 @@ main() {
   # Detect Source
   local src_dir
   if [[ "$self_install" == true ]]; then
+    if [[ -z "${BASH_SOURCE[0]:-}" ]]; then
+      echo "Error: --self flag requires running the script directly, not via pipe"
+      echo "Usage: ./install.sh --self"
+      exit 1
+    fi
     src_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
   else
     src_dir=$(mktemp -d)
