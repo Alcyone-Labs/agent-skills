@@ -15,7 +15,7 @@ A curated collection of AI agent skills for professional software development. E
 
 ## Quick Start
 
-### One-Line Installation
+### One-Line Installation (Interactive)
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/Alcyone-Labs/agent-skills/main/install.sh | bash
@@ -33,7 +33,14 @@ This runs the installer in interactive mode, prompting you to select:
 Installs skills to your user configuration directory:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/Alcyone-Labs/agent-skills/main/install.sh | bash -s -- --global
+# Install all skills to OpenCode
+curl -fsSL https://raw.githubusercontent.com/Alcyone-Labs/agent-skills/main/install.sh | bash -s -- --global --opencode
+
+# Install specific skills only
+curl -fsSL https://raw.githubusercontent.com/Alcyone-Labs/agent-skills/main/install.sh | bash -s -- --global --opencode --skill chrome-extension-architect --skill git-commit-writer
+
+# Install to multiple platforms
+curl -fsSL https://raw.githubusercontent.com/Alcyone-Labs/agent-skills/main/install.sh | bash -s -- --global --opencode --gemini
 ```
 
 #### Local Installation
@@ -41,31 +48,52 @@ curl -fsSL https://raw.githubusercontent.com/Alcyone-Labs/agent-skills/main/inst
 Installs skills to your current project directory:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/Alcyone-Labs/agent-skills/main/install.sh | bash -s -- --local
+curl -fsSL https://raw.githubusercontent.com/Alcyone-Labs/agent-skills/main/install.sh | bash -s -- --local --opencode
 ```
 
-#### Selective Platform Installation
+#### Selective Installation
 
-Install only for specific platforms:
+Install only specific skills to specific platforms:
 
 ```bash
-# OpenCode only
-curl -fsSL https://raw.githubusercontent.com/Alcyone-Labs/agent-skills/main/install.sh | bash -s -- --global --opencode
+# Install only chrome-extension-architect to OpenCode
+curl -fsSL https://raw.githubusercontent.com/Alcyone-Labs/agent-skills/main/install.sh | bash -s -- --global --opencode --skill chrome-extension-architect
 
-# Multiple platforms
-curl -fsSL https://raw.githubusercontent.com/Alcyone-Labs/agent-skills/main/install.sh | bash -s -- --global --opencode --gemini
+# Install multiple skills to multiple platforms
+curl -fsSL https://raw.githubusercontent.com/Alcyone-Labs/agent-skills/main/install.sh | bash -s -- --global --opencode --gemini --skill chrome-extension-architect --skill arg-parser
 
-# All platforms
-curl -fsSL https://raw.githubusercontent.com/Alcyone-Labs/agent-skills/main/install.sh | bash -s -- --global --opencode --gemini --claude --droid --agents --antigravity
+# Install all skills to all platforms
+curl -fsSL https://raw.githubusercontent.com/Alcyone-Labs/agent-skills/main/install.sh | bash -s -- --global --opencode --gemini --claude --droid --agents --antigravity --all-skills
 ```
 
-### Local Development Installation
+#### Clone and Install (for development)
 
-If you've cloned this repository and want to install from the local files:
+If you want to inspect the code before installing:
 
 ```bash
-./install.sh --self --global
+# Clone the repository
+git clone https://github.com/Alcyone-Labs/agent-skills.git /tmp/agent-skills
+cd /tmp/agent-skills
+
+# Install from the cloned repository
+./install.sh --self --global --opencode
+
+# Or install specific skills
+./install.sh --self --global --opencode --skill chrome-extension-architect
 ```
+
+### Available Skills
+
+| Skill | Description |
+|-------|-------------|
+| `aquaria-cloudflare-ops` | Operate and debug Aquaria Cloudflare Worker + Workflows deployment |
+| `arg-parser` | Type-safe CLI argument parser with MCP integration, Zod validation, and auto-generated tools |
+| `chrome-extension-architect` | Privacy-first Chrome Manifest V3 extension architect |
+| `git-commit-writer` | Write consistent, high-quality Git commits following project conventions |
+| `large-file-refactorer` | Scan codebase for large files and orchestrate refactoring workflows using a test-first protocol |
+| `skill-forge` | Build precise production-ready custom Agent Skills following AgentSkills.io guidelines |
+
+**Tip:** Use `--skill <name>` to install specific skills, or `--all-skills` to install everything.
 
 ## Updating Skills
 

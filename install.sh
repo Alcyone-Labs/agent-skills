@@ -36,13 +36,17 @@ Options:
   -l, --local     Install locally (project ./)
   -h, --help      Show this help message
 
-Selective Flags:
+Platform Flags (at least one required when piping):
   --opencode      Target OpenCode only
   --gemini        Target Gemini CLI only
   --claude        Target Claude only
   --droid         Target FactoryAI Droid only
   --agents        Target Agents only (Default if no flags)
   --antigravity   Target Antigravity only
+
+Skill Selection (optional, when piping):
+  --skill NAME    Install specific skill (can be used multiple times)
+  --all-skills    Install all available skills (default when piping)
 
 Interactive Mode:
   If no flags are provided, an interactive prompt will guide you.
@@ -61,6 +65,33 @@ update_gitignore() {
     echo "$entry" >> .gitignore
     echo "Added '$entry' to .gitignore"
   fi
+}
+
+# Check if we're in an interactive environment
+# Returns true if stdin is a terminal OR if we're in a test environment
+is_interactive() {
+  # If stdin is a terminal, we're definitely interactive
+  [[ -t 0 ]] && return 0
+  
+  # Check if we're running in a test environment (BATS)
+  # BATS sets specific environment variables
+  [[ -n "${BATS_TEST_FILENAME:-}" ]] && return 0
+  
+  # Check if we're being run with input redirection for testing
+  # This detects if stdin is a pipe with actual data (not the script itself)
+  if [[ -p /dev/stdin ]]; then
+    # It's a pipe - check if there's data available
+    # We do this by trying to peek at the data without consuming it
+    local has_data
+    has_data=$(cat <&0 2>/dev/null | head -c 1 | wc -c)
+    if [[ "$has_data" -gt 0 ]]; then
+      # There's data in the pipe - likely test input
+      return 0
+    fi
+  fi
+  
+  # No input available and not a terminal - probably piped script
+  return 1
 }
 
 main() {
@@ -83,6 +114,20 @@ main() {
       --factory) target_platforms+=("FactoryAI Droid"); shift ;;
       --agents) target_platforms+=("Agents"); shift ;;
       --antigravity) target_platforms+=("Antigravity"); shift ;;
+      --skill) 
+        if [[ -n "${2:-}" ]]; then
+          target_skills+=("$2")
+          shift 2
+        else
+          echo "Error: --skill requires a skill name"
+          exit 1
+        fi
+        ;;
+      --all-skills) 
+        # Mark to install all skills - will be populated after detecting available skills
+        target_skills=("__ALL__")
+        shift
+        ;;
       *) echo "Unknown option: $1"; usage; exit 1 ;;
     esac
   done
@@ -96,6 +141,12 @@ main() {
       exit 1
     fi
     src_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+  elif [[ -n "${BASH_SOURCE[0]:-}" ]] && [[ -d "$(dirname "${BASH_SOURCE[0]}")/skills" ]]; then
+    # Script is being run directly from a cloned repo (not piped)
+    # Check if there's a skills directory next to the script
+    src_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+    echo "Detected local repository at: $src_dir"
+    echo "Using --self mode automatically"
   else
     src_dir=$(mktemp -d)
     trap "rm -rf '$src_dir'" EXIT
@@ -104,6 +155,24 @@ main() {
 
   # 2. Interactive Logic
   if [[ "$install_type" == "interactive" ]] || [[ ${#target_platforms[@]} -eq 0 ]]; then
+    # Check if we're in a non-interactive environment (piped)
+    if ! is_interactive; then
+      echo "Error: Interactive mode requires a terminal."
+      echo "When piping the script, you must specify platforms and installation type explicitly."
+      echo ""
+      echo "Examples:"
+      echo "  curl ... | bash -s -- --global --opencode"
+      echo "  curl ... | bash -s -- --local --opencode --gemini"
+      echo "  curl ... | bash -s -- --global --opencode --skill chrome-extension-architect"
+      echo ""
+      echo "Available platforms: --opencode, --gemini, --claude, --droid, --agents, --antigravity"
+      echo "Available skills: aquaria-cloudflare-ops, arg-parser, chrome-extension-architect, git-commit-writer, large-file-refactorer, skill-forge"
+      echo ""
+      echo "Use --skill NAME to install specific skills (can be used multiple times)"
+      echo "Use --all-skills to install all available skills"
+      exit 1
+    fi
+    
     install_type="global" # Reset default for interactive flow
 
     # A. Select Scope
@@ -262,7 +331,45 @@ main() {
     done
   fi
 
-  if [[ ${#available_skills[@]} -gt 0 ]]; then
+  # Handle --all-skills flag (expand to all available skills)
+  if [[ ${#target_skills[@]} -gt 0 ]]; then
+    local has_all_flag=false
+    local new_target_skills=()
+    for skill in "${target_skills[@]}"; do
+      if [[ "$skill" == "__ALL__" ]]; then
+        has_all_flag=true
+      else
+        new_target_skills+=("$skill")
+      fi
+    done
+    if [[ "$has_all_flag" == true ]]; then
+      target_skills=("${available_skills[@]}")
+    else
+      target_skills=("${new_target_skills[@]}")
+    fi
+  fi
+
+  # If skills were specified via --skill flags, validate them
+  if [[ ${#target_skills[@]} -gt 0 ]]; then
+    local validated_skills=()
+    for skill in "${target_skills[@]}"; do
+      local found=false
+      for available in "${available_skills[@]}"; do
+        if [[ "$skill" == "$available" ]]; then
+          found=true
+          validated_skills+=("$skill")
+          break
+        fi
+      done
+      if [[ "$found" == false ]]; then
+        echo "Warning: Skill '$skill' not found, skipping"
+      fi
+    done
+    target_skills=("${validated_skills[@]}")
+  fi
+
+  # Interactive skill selection (only if we have a terminal)
+  if [[ ${#available_skills[@]} -gt 0 ]] && is_interactive && [[ ${#target_skills[@]} -eq 0 ]]; then
     echo ""
     echo "Select skills (toggle with number, comma/space separated, choose Done when finished):"
 
@@ -367,8 +474,6 @@ main() {
       done
       echo ""
     done
-  else
-    target_skills=("${available_skills[@]}")
   fi
 
   # If no skills found or selected, default to all
