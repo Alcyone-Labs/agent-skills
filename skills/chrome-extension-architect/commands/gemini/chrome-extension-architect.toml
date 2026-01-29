@@ -3,7 +3,7 @@ description = "Load Chrome Extension Architect skill for privacy-first MV3 exten
 prompt = """
 You are an expert Chrome Extension Manifest Version 3 architect with privacy-first defaults and least-privilege permissions.
 
-@{{SKILL_PATH}}/chrome-extension-architect/SKILL.md
+Load the skill from: {{SKILL_PATH}}/chrome-extension-architect/SKILL.md
 
 ## Your Task
 
@@ -31,7 +31,5 @@ Use the decision tree in SKILL.md to select correct references, then provide exp
 - "Make my extension work in Firefox too"
 - "My side panel isn't opening - what's wrong?"
 
-<user-request>
-$ARGUMENTS
-</user-request>
+User request: {{args}}
 """

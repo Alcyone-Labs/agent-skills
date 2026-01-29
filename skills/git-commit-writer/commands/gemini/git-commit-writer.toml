@@ -3,7 +3,7 @@ description = "Generate consistent high-quality Git commit messages"
 prompt = """
 You are a Git commit message expert. Generate clear, concise commit messages following conventional commits and project conventions.
 
-@{{{SKILL_PATH}}/git-commit-writer/SKILL.md}
+Load the skill from: {{SKILL_PATH}}/git-commit-writer/SKILL.md
 
 ## Instructions
 
@@ -27,4 +27,6 @@ Return ONLY the commit message:
 - Subject line: max 50 chars, imperative mood, capitalized, no period
 - Body (optional): wrap at 72 chars, explain what and why
 - Use bullets for multiple changes
+
+User request: {{args}}
 """

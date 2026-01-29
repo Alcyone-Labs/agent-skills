@@ -68,3 +68,7 @@ Total time: [duration]
 
 See full report above for details.
 ```
+
+<user-request>
+$ARGUMENTS
+</user-request>

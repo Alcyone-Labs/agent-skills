@@ -437,6 +437,9 @@ main() {
       elif [[ "$p_norm" == "gemini" ]]; then
         cmd_src="${src_dir}/commands/gemini/${skill_name}.toml"
         cmd_ext=".toml"
+      elif [[ "$p_norm" == "droid" ]]; then
+        cmd_src="${src_dir}/commands/droid/${skill_name}.md"
+        cmd_ext=".md"
       fi
 
       if [[ -n "$cmd_src" && -f "$cmd_src" ]]; then
@@ -445,8 +448,8 @@ main() {
 
         cp "$cmd_src" "$target_cmd"
 
-        # Post-process for Gemini
-        if [[ "$p_norm" == "gemini" ]]; then
+        # Post-process for Gemini and Droid
+        if [[ "$p_norm" == "gemini" || "$p_norm" == "droid" ]]; then
            # Use | as delimiter for sed
            sed "s|{{SKILL_PATH}}|${target_skill_dir}|g" "$target_cmd" > "$target_cmd.tmp" && mv "$target_cmd.tmp" "$target_cmd"
         fi
@@ -466,7 +469,7 @@ main() {
         "OpenCode") s_base="$HOME/.config/opencode/skills"; c_base="$HOME/.config/opencode/commands" ;;
         "Gemini CLI") s_base="$HOME/.gemini/skills"; c_base="$HOME/.gemini/commands" ;;
         "Claude") s_base="$HOME/.claude/skills" ;;
-        "FactoryAI Droid") s_base="$HOME/.factory/skills" ;;
+        "FactoryAI Droid") s_base="$HOME/.factory/skills"; c_base="$HOME/.factory/commands" ;;
         "Agents") s_base="$HOME/.config/agents/skills" ;;
         "Antigravity") s_base="$HOME/.antigravity/skills" ;;
       esac
@@ -475,7 +478,7 @@ main() {
         "OpenCode") s_base=".opencode/skills"; c_base=".opencode/commands" ;;
         "Gemini CLI") s_base=".gemini/skills"; c_base=".gemini/commands" ;;
         "Claude") s_base=".claude/skills" ;;
-        "FactoryAI Droid") s_base=".factory/skills" ;;
+        "FactoryAI Droid") s_base=".factory/skills"; c_base=".factory/commands" ;;
         "Agents") s_base=".agents/skills" ;;
         "Antigravity") s_base=".antigravity/skills" ;;
       esac

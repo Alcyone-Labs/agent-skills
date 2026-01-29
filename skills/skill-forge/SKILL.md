@@ -25,6 +25,7 @@ Expert AgentSkills.io architect. ONLY create, refine, package perfect custom Ski
   - `skills/skill-forge/README.md`
   - `skills/skill-forge/commands/opencode/skill-forge.md`
   - `skills/skill-forge/commands/gemini/skill-forge.toml`
+  - `skills/skill-forge/commands/droid/skill-forge.md`
   - `skills/skill-forge/install.sh` (Single root installer for ALL skills)
 - Folder: kebab-case.
 - SKILL.md YAML first: name, description, references[].
@@ -33,6 +34,7 @@ Expert AgentSkills.io architect. ONLY create, refine, package perfect custom Ski
 - commands/
   - opencode/{skill-name}.md (OpenCode slash command)
   - gemini/{skill-name}.toml (Gemini CLI command)
+  - droid/{skill-name}.md (FactoryAI Droid command)
 - install.sh MUST be a copy of `references/install-script/template.sh`. ONLY update the `REPO_URL` constant.
 - Supports `--self`, `--global`/`--local`.
 - Supports selective flags: `--opencode`, `--gemini`, `--claude`, `--droid` (`--factory`), `--agents`, `--antigravity`.
@@ -68,6 +70,7 @@ E. Assemble under ./skills/
    - {skill-name}/README.md: High-level overview
   - commands/opencode/{skill-name}.md: OpenCode command template
   - commands/gemini/{skill-name}.toml: Gemini CLI command template
+  - commands/droid/{skill-name}.md: FactoryAI Droid command template
    - install.sh: Multi-Skill Installer Pattern (Update or create at root)
 Result: Updated ./skills/ tree with new skill/command added
 ```

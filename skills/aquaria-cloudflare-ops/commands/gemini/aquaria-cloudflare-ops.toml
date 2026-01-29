@@ -19,4 +19,6 @@ Always:
 4. Enable kill switch before incident investigation
 
 Provide concrete commands from SKILL.md examples.
+
+User request: {{args}}
 """

@@ -39,3 +39,7 @@ Action: <what was done>
 Commands used: <list>
 Status: <result>
 ```
+
+<user-request>
+$ARGUMENTS
+</user-request>

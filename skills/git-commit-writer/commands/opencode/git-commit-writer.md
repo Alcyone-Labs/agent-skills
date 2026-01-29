@@ -86,3 +86,7 @@ Return ONLY the commit message, no commentary.
 ```
 /git-commit-writer --update-skill
 ```
+
+<user-request>
+$ARGUMENTS
+</user-request>
