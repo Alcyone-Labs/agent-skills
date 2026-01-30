@@ -139,9 +139,12 @@ main() {
   # If no explicit flags provided and we're not interactive, show error
   if [[ "$explicit_flags" == false ]] && ! is_interactive; then
     echo "Error: Interactive mode requires a terminal."
-    echo "When piping the script without explicit flags, you must specify platforms and installation type."
     echo ""
-    echo "Examples:"
+    echo "For interactive installation, clone the repository first:"
+    echo "  git clone ${REPO_URL} /tmp/agent-skills"
+    echo "  /tmp/agent-skills/install.sh --self"
+    echo ""
+    echo "Or specify platforms explicitly when piping:"
     echo "  curl ... | bash -s -- --global --opencode"
     echo "  curl ... | bash -s -- --local --opencode --gemini"
     echo "  curl ... | bash -s -- --global --opencode --skill chrome-extension-architect"
@@ -525,17 +528,13 @@ main() {
       local cmd_ext=""
 
       if [[ "$p_norm" == "opencode" ]]; then
-        cmd_src="${src_dir}/commands/opencode/${skill_name}.md"
+        cmd_src="${src_dir}/skills/${skill_name}/commands/opencode/${skill_name}.md"
         cmd_ext=".md"
-        # Fallback for backward compatibility
-        if [[ ! -f "$cmd_src" ]]; then
-            cmd_src="${src_dir}/commands/${skill_name}.md"
-        fi
       elif [[ "$p_norm" == "gemini" ]]; then
-        cmd_src="${src_dir}/commands/gemini/${skill_name}.toml"
+        cmd_src="${src_dir}/skills/${skill_name}/commands/gemini/${skill_name}.toml"
         cmd_ext=".toml"
       elif [[ "$p_norm" == "droid" ]]; then
-        cmd_src="${src_dir}/commands/droid/${skill_name}.md"
+        cmd_src="${src_dir}/skills/${skill_name}/commands/droid/${skill_name}.md"
         cmd_ext=".md"
       fi
 

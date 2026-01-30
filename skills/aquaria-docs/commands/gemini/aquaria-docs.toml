@@ -1,0 +1,34 @@
+# Aquaria Docs Command for Gemini CLI
+
+name = "aquaria-docs"
+description = "Create or validate Aquaria project documentation following strict documentation principles and quality gates"
+
+[usage]
+default = """
+Create or validate Aquaria project documentation.
+
+Examples:
+- /aquaria-docs create user-auth --template guide
+- /aquaria-docs validate docs/building/steps/templating.md
+- /aquaria-docs scaffold workflows
+
+Available templates:
+- base: Universal template
+- guide: Feature guides and tutorials
+- api-reference: API documentation
+- cli-reference: CLI tool documentation
+- troubleshooting: Error guides and FAQ
+- design-doc: Technical specifications
+"""
+
+[[options]]
+name = "--template"
+description = "Template type: base, guide, api-reference, design-doc, cli-reference, troubleshooting"
+
+[[options]]
+name = "--topic"
+description = "Documentation topic/path"
+
+[[options]]
+name = "--skip-validation"
+description = "Skip quality gate checks"

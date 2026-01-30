@@ -15,32 +15,34 @@ A curated collection of AI agent skills for professional software development. E
 
 ## Quick Start
 
-### One-Line Installation (Interactive)
+### Recommended: Clone and Install (Interactive)
+
+For the best experience with interactive prompts to select platforms and skills:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/Alcyone-Labs/agent-skills/main/install.sh | bash
+# Clone the repository
+git clone https://github.com/Alcyone-Labs/agent-skills.git /tmp/agent-skills
+
+# Run the installer interactively
+/tmp/agent-skills/install.sh --self
 ```
 
-This runs the installer in interactive mode, prompting you to select:
-- Installation scope (global or local)
-- Target platforms (OpenCode, Gemini CLI, Claude, FactoryAI Droid, Agents, Antigravity)
-- Skills to install
+This allows you to:
+- Interactively select installation scope (global or local)
+- Choose target platforms (OpenCode, Gemini CLI, Claude, FactoryAI Droid, Agents, Antigravity)
+- Pick which skills to install
+- Review the code before running
 
-### Installation Options
+### Quick Installation (Non-Interactive)
 
-#### Global Installation (Recommended)
-
-Installs skills to your user configuration directory:
+If you know exactly what you want, install directly without cloning:
 
 ```bash
-# Install all skills to OpenCode
-curl -fsSL https://raw.githubusercontent.com/Alcyone-Labs/agent-skills/main/install.sh | bash -s -- --global --opencode
-
-# Install specific skills only
+# Install specific skills to OpenCode
 curl -fsSL https://raw.githubusercontent.com/Alcyone-Labs/agent-skills/main/install.sh | bash -s -- --global --opencode --skill chrome-extension-architect --skill git-commit-writer
 
-# Install to multiple platforms
-curl -fsSL https://raw.githubusercontent.com/Alcyone-Labs/agent-skills/main/install.sh | bash -s -- --global --opencode --gemini
+# Install all skills to multiple platforms
+curl -fsSL https://raw.githubusercontent.com/Alcyone-Labs/agent-skills/main/install.sh | bash -s -- --global --opencode --gemini --all-skills
 ```
 
 #### Local Installation

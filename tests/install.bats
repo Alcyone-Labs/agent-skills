@@ -159,10 +159,23 @@ teardown() {
   [ "$skill_count" -gt 1 ]
 }
 
-@test "install.sh auto-detects local repository and uses --self mode" {
-  cd "$BATS_TEST_DIRNAME/.."
-  run bash ./install.sh --global --opencode --skill chrome-extension-architect
+@test "install.sh installs commands for opencode" {
+  cd "$TEMP_DIR"
+  run bash "$BATS_TEST_DIRNAME/../install.sh" --self --global --opencode --skill chrome-extension-architect
   [ "$status" -eq 0 ]
-  [[ "$output" == *"Detected local repository"* ]]
-  [ -d "$HOME/.config/opencode/skills/chrome-extension-architect" ]
+  [ -f "$HOME/.config/opencode/commands/chrome-extension-architect.md" ]
+}
+
+@test "install.sh installs commands for gemini" {
+  cd "$TEMP_DIR"
+  run bash "$BATS_TEST_DIRNAME/../install.sh" --self --global --gemini --skill chrome-extension-architect
+  [ "$status" -eq 0 ]
+  [ -f "$HOME/.gemini/commands/chrome-extension-architect.toml" ]
+}
+
+@test "install.sh installs commands for droid" {
+  cd "$TEMP_DIR"
+  run bash "$BATS_TEST_DIRNAME/../install.sh" --self --global --droid --skill skill-forge
+  [ "$status" -eq 0 ]
+  [ -f "$HOME/.factory/commands/skill-forge.md" ]
 }
