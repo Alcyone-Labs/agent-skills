@@ -1,29 +1,37 @@
-# Flag Definitions Reference
+# Flags
 
-## Overview
+Flag definitions, types, and validation.
 
-Comprehensive flag definition system with type validation inheritance and dynamic registration.
+## Flag Types
 
-## Decision Tree
+- `String` / `"string"` - Text values
+- `Number` / `"number"` - Numeric values
+- `Boolean` / `"boolean"` - True/false flags
+- `Array` / `"array"` - Multiple values
+- `Object` / `"object"` - Structured data
+- `Zod Schema` - Runtime validation
 
+## Flag Properties
+
+- `name` - Output property name
+- `options` - CLI flags (e.g., ["-v", "--verbose"])
+- `type` - Data type
+- `mandatory` - Required flag
+- `defaultValue` - Default if not provided
+- `description` - Help text
+- `validate` - Custom validation function
+
+## Example
+
+```typescript
+{
+  name: "config",
+  options: ["--config", "-c"],
+  type: z.object({ host: z.string() }),
+  mandatory: true,
+  description: "Configuration object",
+  validate: (val) => val.host ? true : "Host required"
+}
 ```
-What flag type?
-├── Simple string → type: String
-├── Number → type: Number with optional validate
-├── Boolean → type: Boolean or flagOnly
-├── Multiple values → type: String + allowMultiple
-├── Structured data → Zod schema
-└── Complex validation → validate function
 
-Need environment fallback?
-└── Add env property
-
-Conditional requirement?
-└── mandatory: (args) => boolean
-```
-
-## Topics
-
-- `api.md` - IFlag interface and type definitions
-- `patterns.md` - Common flag patterns
-- `gotchas.md` - Flag pitfalls
+See main SKILL.md for flag patterns.

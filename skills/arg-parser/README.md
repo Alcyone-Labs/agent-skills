@@ -1,48 +1,48 @@
 # ArgParser Skill
 
-Type-safe CLI argument parser with MCP integration Zod validation and auto-generated tools.
+Type-safe CLI argument parser with MCP integration, Zod validation, auto-generated tools, and interactive prompts.
 
 ## Overview
 
-This skill provides comprehensive guidance for building CLI tools using the @alcyone-labs/arg-parser library with features including:
+This skill provides expert knowledge for building CLI tools with @alcyone-labs/arg-parser. It covers:
 
-- Type-safe argument parsing with Zod schemas
-- MCP (Model Context Protocol) server integration
-- Unified CLI/MCP tool definitions
-- Flag inheritance and subcommand support
-- DXT (Distributed Extension) generation
+- **Core API**: ArgParser, flags, subcommands, handlers
+- **Interactive Prompts**: @clack/prompts integration for dual-mode CLIs
+- **MCP Integration**: Model Context Protocol server capabilities
+- **Type System**: TypeScript types, Zod schemas, validation
 
 ## When to Use
 
-- Building new CLI tools with TypeScript
-- Adding MCP capabilities to existing CLIs
-- Creating tools that work both as CLI and MCP servers
-- Implementing complex flag validation with Zod
-
-## Structure
-
-- `SKILL.md` - Main skill manifest with rules and workflow
-- `references/core-api/` - ArgParser class API reference
-- `references/flags/` - Flag definitions and options
-- `references/mcp-integration/` - MCP server configuration
-- `references/types/` - TypeScript interfaces and types
-- `commands/opencode/arg-parser.md` - OpenCode slash command
-- `commands/gemini/arg-parser.toml` - Gemini CLI command
+- Building CLI tools with argument parsing
+- Adding MCP server capabilities to CLIs
+- Creating dual-mode tools (CLI + programmatic)
+- Need type-safe flag definitions with validation
+- Want interactive prompts alongside flags
 
 ## Quick Start
 
 ```typescript
 import { ArgParser } from "@alcyone-labs/arg-parser";
 
-const parser = new ArgParser({
-  appName: "My CLI",
-  appCommandName: "my-cli",
-  handler: async (ctx) => {
-    console.log("Running with:", ctx.args);
-  },
-}).addFlags([
-  { name: "input", options: ["--input", "-i"], type: String },
-]);
+const cli = new ArgParser({
+  appName: "my-cli",
+  handler: async (ctx) => console.log(ctx.args),
+}).addFlags([{ name: "input", options: ["-i"], type: String, mandatory: true }]);
 
-parser.parse(process.argv);
+await cli.parse();
+```
+
+## References
+
+- `core-api/` - ArgParser class, handlers, context
+- `flags/` - Flag definitions, types, validation
+- `interactive-prompts/` - @clack/prompts integration
+- `mcp-integration/` - MCP server setup
+- `types/` - TypeScript types and interfaces
+
+## Installation
+
+```bash
+./install.sh --local   # Local install
+./install.sh --global  # Global install
 ```

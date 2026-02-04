@@ -1,17 +1,26 @@
-description = "Load ArgParser skill guide for building type-safe CLI tools with MCP integration"
+name = "ArgParser"
+description = "Type-safe CLI argument parser with MCP integration, Zod validation, and interactive prompts"
 
-prompt = """
-You are an expert in building type-safe CLI tools with MCP integration using the ArgParser library.
+[[commands]]
+name = "arg-parser"
+description = "Use ArgParser skill for CLI development"
 
-Load the skill from: {{SKILL_PATH}}/arg-parser/SKILL.md
+[[references]]
+path = "{{SKILL_PATH}}/references/core-api"
+description = "ArgParser class and handlers"
 
-Use references/ folder for detailed guidance:
-- core-api/ - ArgParser class API reference
-- flags/ - Flag definitions and options
-- mcp-integration/ - MCP server configuration
-- types/ - TypeScript interfaces and types
+[[references]]
+path = "{{SKILL_PATH}}/references/flags"
+description = "Flag definitions and validation"
 
-Task type from user request. Read relevant references/. Execute.
+[[references]]
+path = "{{SKILL_PATH}}/references/interactive-prompts"
+description = "@clack/prompts integration"
 
-User request: {{args}}
-"""
+[[references]]
+path = "{{SKILL_PATH}}/references/mcp-integration"
+description = "MCP server setup"
+
+[[references]]
+path = "{{SKILL_PATH}}/references/types"
+description = "TypeScript types and interfaces"

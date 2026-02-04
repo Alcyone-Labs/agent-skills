@@ -1,26 +1,47 @@
-# MCP Integration Reference
+# MCP Integration
+
+Model Context Protocol server integration.
 
 ## Overview
 
-Add MCP (Model Context Protocol) server capabilities to CLI tools. Expose CLI functionality as MCP tools with auto-generated schemas.
+Turn any CLI into an MCP server that AI tools can call.
 
-## Decision Tree
+## Setup
 
-```
-Need MCP support?
-├── Simple MCP → withMcp() with stdio transport
-├── Multiple transports → defaultTransports array
-├── HTTP server → streamable-http transport
-├── Tools → addTool() for CLI+MCP unified tools
-└── Custom logging → createMcpLogger()
-
-Output schema needed?
-├── Standard pattern → "successWithData" | "successError" | "list"
-└── Custom → Zod schema or Record
+```typescript
+const parser = new ArgParser({...})
+  .withMcp({
+    serverInfo: {
+      name: "my-cli",
+      version: "1.0.0"
+    },
+    defaultTransport: { type: "stdio" }
+  });
 ```
 
-## Topics
+## Tools
 
-- `api.md` - withMcp configuration and transport types
-- `patterns.md` - MCP server patterns
-- `gotchas.md` - MCP pitfalls
+Auto-generated from CLI flags:
+
+```typescript
+parser.addTool({
+  name: "search",
+  description: "Search items",
+  flags: [...],
+  handler: async (ctx) => ({ results: [] }),
+  outputSchema: "successWithData"
+});
+```
+
+## DXT Bundling
+
+```typescript
+.withMcp({
+  dxt: {
+    include: ["config/", "assets/"],
+    exclude: ["tests/"]
+  }
+})
+```
+
+See main SKILL.md for MCP workflow.

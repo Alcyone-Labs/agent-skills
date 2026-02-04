@@ -1,23 +1,33 @@
-# Types Reference
+# Types
 
-## Overview
+TypeScript types and interfaces.
 
-TypeScript interfaces and type definitions for @alcyone-labs/arg-parser.
+## Core Types
 
-## Decision Tree
+- `IFlag` - Flag definition input
+- `ProcessedFlag` - Flag after processing
+- `TParsedArgs` - Parsed arguments type
+- `IHandlerContext` - Handler context
+- `IArgParserParams` - Constructor options
 
+## Interactive Prompts Types
+
+- `IPromptableFlag` - Flag with prompt support
+- `IInteractiveSubCommand` - Subcommand with prompts
+- `PromptFieldConfig` - Prompt configuration
+- `PromptType` - Prompt type union
+- `PromptWhen` - When to trigger prompts
+
+## MCP Types
+
+- `IMcpServerMethods` - MCP server interface
+- `McpTransportConfig` - Transport configuration
+- `ToolConfig` - Tool definition
+
+## Usage
+
+```typescript
+import type { IFlag, IHandlerContext, IPromptableFlag } from "@alcyone-labs/arg-parser";
 ```
-What do you need?
-├── Handler context → IHandlerContext
-├── Flag definitions → IFlag / IFlagCore
-├── Parser results → ParseResult
-├── Tool config → ToolConfig
-├── Transport config → McpTransportConfig
-└── Authentication → AuthOptions / JwtVerifyOptions
-```
 
-## Topics
-
-- `api.md` - Complete type definitions
-- `patterns.md` - Type usage patterns
-- `gotchas.md` - Type-related issues
+See main SKILL.md for type examples.

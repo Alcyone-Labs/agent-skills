@@ -1,21 +1,39 @@
-# Core API Reference
+# Core API
 
-## Overview
+ArgParser core class, handlers, and context.
 
-Core ArgParser class API with constructor methods and lifecycle.
+## ArgParser Class
 
-## Decision Tree
+Main class for building CLI tools.
 
-```
-Need CLI parsing?
-├── Simple CLI → ArgParser with flags
-├── Subcommands → addSubCommand()
-├── MCP support → withMcp()
-└── Complex validation → Zod schemas in flags
+### Constructor
+
+```typescript
+new ArgParser(options?: IArgParserParams, initialFlags?: IFlag[])
 ```
 
-## Topics
+### Key Methods
 
-- `api.md` - Class signatures and method references
-- `patterns.md` - Common implementation patterns
-- `gotchas.md` - Pitfalls and edge cases
+- `addFlag(flag)` - Add single flag
+- `addFlags(flags)` - Add multiple flags
+- `addSubCommand(config)` - Add subcommand
+- `parse(args?, options?)` - Parse and execute
+- `setHandler(handler)` - Set main handler
+- `helpText()` - Generate help text
+
+### Handler Context
+
+```typescript
+interface IHandlerContext {
+  args: TParsedArgs; // Parsed flag values
+  parentArgs?: TParsedArgs; // Parent command args (subcommands)
+  commandChain: string[]; // Command hierarchy
+  parser: ArgParserInstance; // Current parser
+  displayHelp(): void; // Show help
+  systemArgs?: ISystemArgs; // System flags
+  promptAnswers?: Record; // Interactive answers
+  isInteractive?: boolean; // Interactive mode flag
+}
+```
+
+See main SKILL.md for complete workflow examples.

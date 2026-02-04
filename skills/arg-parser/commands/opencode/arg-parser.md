@@ -1,52 +1,85 @@
----
-description: Load ArgParser skill guide for building type-safe CLI tools with MCP integration
----
+# ArgParser Skill
 
-## Workflow
+Type-safe CLI argument parser with MCP integration, Zod validation, and interactive prompts.
 
-### Step 1: Check for --update-skill flag
+## Usage
 
-If `$ARGUMENTS` contains `--update-skill`:
-1. Determine install location (local `.opencode/` or global `~/.config/opencode/`)
-2. Run: `curl -fsSL https://raw.githubusercontent.com/Alcyone-Labs/agent-skills/main/install.sh | bash` (add `-s -- --global` for global)
-3. Output success and stop
+```typescript
+import { ArgParser } from "@alcyone-labs/arg-parser";
 
-### Step 2: Load skill
+const cli = new ArgParser({
+  appName: "my-cli",
+  handler: async (ctx) => console.log(ctx.args),
+}).addFlags([{ name: "input", options: ["-i"], type: String, mandatory: true }]);
 
-```javascript
-skill({ name: 'arg-parser' });
+await cli.parse();
 ```
 
-### Step 3: Identify task type
+## Key Features
 
-Analyze `$ARGUMENTS` to determine:
-- **Task type**: new CLI, add MCP, add flags, complex validation
-- **Scope**: single command, multi-command CLI, library usage
+- **Type-safe flags** with Zod validation
+- **MCP integration** for AI tools
+- **Interactive prompts** via @clack/prompts
+- **Subcommands** with inheritance
+- **DXT generation** for distribution
 
-### Step 4: Read relevant reference files
+## Examples
 
-Based on task type, read from `references/<topic>/`:
+### Basic CLI
 
-| Task | Files to Read |
-|------|---------------|
-| New CLI tool | `core-api/` + `flags/` |
-| MCP integration | `mcp-integration/` |
-| Type definitions | `types/` |
-| Complex flags | `flags/` + `core-api/` |
+Create simple CLI with flags:
 
-### Step 5: Execute
-
-Apply SKILL.md rules and reference docs. Provide code examples.
-
-### Step 6: Summarize
-
-```
-=== ArgParser Task Complete ===
-Action: <what was done>
-Files created: <list>
-Key features: <list>
+```typescript
+const cli = new ArgParser({
+  appName: "deploy",
+  handler: async (ctx) => {
+    console.log(`Deploying to ${ctx.args.env}`);
+  },
+}).addFlags([{ name: "env", options: ["--env"], type: String }]);
 ```
 
-<user-request>
-$ARGUMENTS
-</user-request>
+### Interactive Mode
+
+Add prompts alongside flags:
+
+```typescript
+const cli = new ArgParser({
+  appName: "setup",
+  promptWhen: "interactive-flag",
+}).addFlag({
+  name: "name",
+  options: ["--name"],
+  type: "string",
+  prompt: async () => ({
+    type: "text",
+    message: "Project name:",
+  }),
+} as IPromptableFlag);
+```
+
+### MCP Server
+
+Add MCP capabilities:
+
+```typescript
+const parser = new ArgParser({...})
+  .withMcp({
+    serverInfo: { name: "my-mcp", version: "1.0.0" },
+    defaultTransport: { type: "stdio" }
+  });
+```
+
+## References
+
+- `core-api/` - ArgParser class and handlers
+- `flags/` - Flag definitions and validation
+- `interactive-prompts/` - @clack/prompts integration
+- `mcp-integration/` - MCP server setup
+- `types/` - TypeScript types
+
+## Rules
+
+- Use `mandatory` not `required` for required flags
+- Cast promptable flags: `as IPromptableFlag`
+- Import types from `#/core/types`
+- Use `--interactive` flag to trigger prompts
