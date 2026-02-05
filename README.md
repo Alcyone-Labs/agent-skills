@@ -15,23 +15,37 @@ A curated collection of AI agent skills for professional software development. E
 
 ## Quick Start
 
-### Recommended: Clone and Install (Interactive)
+### Interactive Installation (Recommended)
 
-For the best experience with interactive prompts to select platforms and skills:
+For the best experience with beautiful interactive prompts:
+
+```bash
+# Clone the repository
+git clone https://github.com/Alcyone-Labs/agent-skills.git /tmp/agent-skills
+cd /tmp/agent-skills
+
+# Run the interactive TypeScript installer
+./install-interactive.sh
+```
+
+This interactive installer will guide you through:
+1. **Installation Scope** - Choose global (~/user space) or local (./project)
+2. **Target Platforms** - Select which agents to install to (Agents pre-selected by default)
+3. **Skills Selection** - Pick which skills to install from the available collection
+4. **Command Installation** - Optionally install commands for supported platforms (default: no)
+5. **Gitignore Update** - Optionally add agent folders to .gitignore (default: no, local only)
+
+### Bash Installer (Alternative)
+
+For a lighter-weight interactive experience or non-interactive usage:
 
 ```bash
 # Clone the repository
 git clone https://github.com/Alcyone-Labs/agent-skills.git /tmp/agent-skills
 
-# Run the installer interactively
+# Run the bash installer interactively
 /tmp/agent-skills/install.sh --self
 ```
-
-This allows you to:
-- Interactively select installation scope (global or local)
-- Choose target platforms (OpenCode, Gemini CLI, Claude, FactoryAI Droid, Agents, Antigravity)
-- Pick which skills to install
-- Review the code before running
 
 ### Quick Installation (Non-Interactive)
 
@@ -178,7 +192,10 @@ skills/<skill-name>/
 ### Testing Installation Locally
 
 ```bash
-# Test local installation
+# Test interactive TypeScript installer
+./install-interactive.sh
+
+# Test bash installer
 ./install.sh --self --local
 
 # Test with specific platforms

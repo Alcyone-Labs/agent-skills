@@ -54,6 +54,9 @@ Use this skill when user needs to:
 - TTY detection auto-falls back to flag-only mode in CI/pipes
 - Cancel handler (Ctrl+C) calls `onCancel` callback or exits gracefully
 - Subcommands with prompts need `--interactive` on BOTH root AND sub-parser
+- **Default Value Fallback**: Flag `defaultValue` automatically used as prompt `initial` when not explicitly set
+- **Conditional Skipping**: Use `skip: true` or `skip: condition` to skip prompts based on previous answers
+- **Select All Toggle**: Use `allowSelectAll: true` on multiselect prompts for quick select/deselect all
 
 # Workflow
 
@@ -415,5 +418,106 @@ parser.addFlag({
       return true;
     },
   }),
+} as IPromptableFlag);
+```
+
+## Example 6: Default value fallback in prompts
+
+```typescript
+parser.addFlag({
+  name: "timeout",
+  options: ["--timeout", "-t"],
+  type: "number",
+  defaultValue: 30, // Automatically used as initial in prompt
+  prompt: async () => ({
+    type: "text",
+    message: "Enter timeout (seconds):",
+    // No initial needed - uses defaultValue automatically
+  }),
+} as IPromptableFlag);
+```
+
+## Example 7: Conditional prompt skipping
+
+```typescript
+parser.addFlag({
+  name: "configureAdvanced",
+  options: ["--configure-advanced"],
+  type: "boolean",
+  promptSequence: 1,
+  prompt: async () => ({
+    type: "confirm",
+    message: "Configure advanced options?",
+    initial: false,
+  }),
+} as IPromptableFlag);
+
+parser.addFlag({
+  name: "advancedOptions",
+  options: ["--advanced-options"],
+  type: "string",
+  promptSequence: 2,
+  prompt: async (ctx) => ({
+    type: "text",
+    message: "Enter advanced options:",
+    skip: !ctx.promptAnswers?.configureAdvanced, // Skip if false
+  }),
+} as IPromptableFlag);
+```
+
+## Example 8: Multiselect with select all toggle
+
+```typescript
+parser.addFlag({
+  name: "modules",
+  options: ["--modules", "-m"],
+  type: "array",
+  prompt: async () => ({
+    type: "multiselect",
+    message: "Select modules to install:",
+    options: [
+      { value: "auth", label: "Authentication", hint: "User login" },
+      { value: "database", label: "Database", hint: "Data persistence" },
+      { value: "api", label: "API", hint: "REST endpoints" },
+      { value: "ui", label: "UI", hint: "User interface" },
+    ],
+    allowSelectAll: true, // Enable select all/none toggle
+  }),
+} as IPromptableFlag);
+```
+
+## Example 9: Context-aware pre-configuration
+
+Use CLI flags to pre-configure interactive prompts:
+
+```typescript
+parser.addFlag({
+  name: "global",
+  options: ["--global", "-g"],
+  type: "boolean",
+  prompt: async (ctx) => ({
+    type: "confirm",
+    message: "Install globally?",
+    initial: false,
+    skip: ctx.args.global || ctx.args.local, // Skip if already specified
+  }),
+} as IPromptableFlag);
+
+parser.addFlag({
+  name: "packageManager",
+  options: ["--package-manager", "-p"],
+  type: "string",
+  prompt: async (ctx) => {
+    // Refine options based on pre-configured scope
+    const isGlobal = ctx.args.global || ctx.promptAnswers?.global;
+    const options = isGlobal ? ["npm", "yarn", "pnpm"] : ["npm", "yarn", "pnpm", "bun"];
+
+    return {
+      type: "select",
+      message: "Package manager:",
+      options,
+      initial: ctx.args.packageManager, // Use CLI flag as default
+    };
+  },
 } as IPromptableFlag);
 ```

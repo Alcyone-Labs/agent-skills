@@ -1,0 +1,49 @@
+{
+  "name": "@alcyone-labs/agent-skills",
+  "version": "1.0.0",
+  "description": "Interactive installer for Agent Skills - Install AI agent skills from Alcyone Labs",
+  "type": "module",
+  "main": "./dist/installer.js",
+  "bin": {
+    "agent-skills": "./dist/installer.js"
+  },
+  "files": [
+    "dist/**/*",
+    "README.md"
+  ],
+  "scripts": {
+    "build": "tsc",
+    "dev": "bun run ./src/installer.ts",
+    "start": "bun run ./dist/installer.js",
+    "typecheck": "tsc --noEmit",
+    "prepublishOnly": "npm run build"
+  },
+  "keywords": [
+    "ai",
+    "agents",
+    "skills",
+    "cli",
+    "installer",
+    "opencode",
+    "gemini",
+    "claude",
+    "mcp"
+  ],
+  "author": "Alcyone Labs",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Alcyone-Labs/agent-skills.git",
+    "directory": "installer"
+  },
+  "dependencies": {
+    "@alcyone-labs/arg-parser": "^2.14.2"
+  },
+  "devDependencies": {
+    "@types/node": "^22.19.8",
+    "typescript": "^5.9.3"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}
