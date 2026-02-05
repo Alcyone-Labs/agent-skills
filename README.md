@@ -6,18 +6,43 @@ A curated collection of AI agent skills for professional software development. E
 
 | Skill | Description | Platforms |
 |-------|-------------|-----------|
-| **arg-parser** | Type-safe CLI argument parser with MCP integration, Zod validation, and auto-generated tools | OpenCode, Gemini CLI |
-| **aquaria-cloudflare-ops** | Operate and debug Aquaria Cloudflare Worker + Workflows deployment | OpenCode |
-| **chrome-extension-architect** | Privacy-first Chrome Manifest V3 extension architect | OpenCode, Gemini CLI, FactoryAI Droid |
-| **git-commit-writer** | Write consistent, high-quality Git commits following project conventions | OpenCode |
+| **aquaria-cloudflare-ops** | Operate and debug Aquaria Cloudflare Worker + Workflows deployment. Deploy safely, run health checks, inspect traces, restart stuck instances, apply fixes | OpenCode |
+| **aquaria-docs** | Expert Aquaria documentation architect. Enforce documentation principles, golden rules, templates, folder structure, and quality gates. Creates compliant docs from templates, validates against Golden Rules checklist | OpenCode |
+| **arg-parser** | Type-safe CLI argument parser with MCP integration, Zod validation, auto-generated tools, and interactive prompts | OpenCode, Gemini CLI |
+| **chrome-extension-architect** | Privacy-first Chrome Manifest V3 extension architect. SidePanel design, MV3 service worker lifecycle, least-privilege permission audits, storage strategy, cross-browser sidebar patterns | OpenCode, Gemini CLI, FactoryAI Droid |
+| **git-commit-writer** | Write consistent, high-quality Git commits following project conventions. Analyzes staged changes, classifies commit type, generates conventional commit messages | OpenCode |
 | **large-file-refactorer** | Scan codebase for large files and orchestrate refactoring workflows using a test-first protocol | OpenCode, Gemini CLI |
+| **simple-logger-usage** | Best practices for using simple-logger in TypeScript applications. Structured logging with metadata separation, scoped loggers, Chrome MV3 service worker support | OpenCode |
 | **skill-forge** | Build precise production-ready custom Agent Skills following AgentSkills.io guidelines | OpenCode |
+| **sauve-jazz-extension** | Complete Jazz extension development guidance. Architecture patterns, collections system, labels management, sync patterns, testing, troubleshooting | OpenCode |
 
 ## Quick Start
 
-### Interactive Installation (Recommended)
+### One-Line Installation (Recommended)
 
-For the best experience with beautiful interactive prompts:
+The fastest way to get started - no cloning required:
+
+```bash
+# Using npx (npm)
+npx @alcyone-labs/agent-skills
+
+# Using pnpx (pnpm)
+pnpx @alcyone-labs/agent-skills
+
+# Using bunx (bun)
+bunx @alcyone-labs/agent-skills
+```
+
+This interactive installer will guide you through:
+1. **Installation Scope** - Choose global (~/user space) or local (./project)
+2. **Target Platforms** - Select which agents to install to (Agents pre-selected by default)
+3. **Skills Selection** - Pick which skills to install from the available collection
+4. **Command Installation** - Optionally install commands for supported platforms (default: no)
+5. **Gitignore Update** - Optionally add agent folders to .gitignore (default: no, local only)
+
+### Clone and Install (Development)
+
+For development or to inspect the code before installing:
 
 ```bash
 # Clone the repository
@@ -27,13 +52,6 @@ cd /tmp/agent-skills
 # Run the interactive TypeScript installer
 ./install-interactive.sh
 ```
-
-This interactive installer will guide you through:
-1. **Installation Scope** - Choose global (~/user space) or local (./project)
-2. **Target Platforms** - Select which agents to install to (Agents pre-selected by default)
-3. **Skills Selection** - Pick which skills to install from the available collection
-4. **Command Installation** - Optionally install commands for supported platforms (default: no)
-5. **Gitignore Update** - Optionally add agent folders to .gitignore (default: no, local only)
 
 ### Bash Installer (Alternative)
 
@@ -103,13 +121,16 @@ cd /tmp/agent-skills
 | Skill | Description |
 |-------|-------------|
 | `aquaria-cloudflare-ops` | Operate and debug Aquaria Cloudflare Worker + Workflows deployment |
-| `arg-parser` | Type-safe CLI argument parser with MCP integration, Zod validation, and auto-generated tools |
+| `aquaria-docs` | Expert Aquaria documentation architect with templates and quality gates |
+| `arg-parser` | Type-safe CLI argument parser with MCP integration and interactive prompts |
 | `chrome-extension-architect` | Privacy-first Chrome Manifest V3 extension architect |
 | `git-commit-writer` | Write consistent, high-quality Git commits following project conventions |
-| `large-file-refactorer` | Scan codebase for large files and orchestrate refactoring workflows using a test-first protocol |
-| `skill-forge` | Build precise production-ready custom Agent Skills following AgentSkills.io guidelines |
+| `large-file-refactorer` | Scan codebase for large files and orchestrate refactoring workflows |
+| `simple-logger-usage` | Best practices for structured logging in TypeScript applications |
+| `skill-forge` | Build production-ready custom Agent Skills following AgentSkills.io guidelines |
+| `sauve-jazz-extension` | Complete Jazz extension development with architecture and patterns |
 
-**Tip:** Use `--skill <name>` to install specific skills, or `--all-skills` to install everything.
+**Tip:** Use `--skill <name>` to install specific skills, or `--all` to install everything.
 
 ## Updating Skills
 
@@ -177,6 +198,62 @@ skills/<skill-name>/
 └── references/                 # Reference documentation
     └── <topic>/
         └── README.md
+```
+
+## CLI Reference
+
+The installer supports various flags for non-interactive or scripted usage:
+
+### Installation Scope
+
+| Flag | Description |
+|------|-------------|
+| `--global`, `-g` | Install globally to user space (`~/`) |
+| `--local`, `-l` | Install locally to current project (`./`) |
+
+### Platform Selection
+
+| Flag | Description |
+|------|-------------|
+| `--opencode` | Install for OpenCode |
+| `--gemini` | Install for Gemini CLI |
+| `--claude` | Install for Claude |
+| `--droid` | Install for FactoryAI Droid |
+| `--agents` | Install for Agents |
+| `--antigravity` | Install for Antigravity |
+
+### Skill Selection
+
+| Flag | Description |
+|------|-------------|
+| `--all`, `-a` | Install all available skills |
+| `--skills <name>` | Install specific skill (can be used multiple times) |
+
+### Options
+
+| Flag | Description |
+|------|-------------|
+| `--commands` | Install slash commands for supported agents |
+| `--no-commands` | Skip installing commands |
+| `--gitignore` | Add agent folders to `.gitignore` |
+| `--no-gitignore` | Skip adding to `.gitignore` |
+| `--interactive`, `-i` | Force interactive mode with prompts |
+| `--help`, `-h` | Show help message with all available options |
+
+### Examples
+
+```bash
+# Install all skills globally for OpenCode (non-interactive)
+npx @alcyone-labs/agent-skills --global --opencode --all
+
+# Install specific skills locally with commands
+npx @alcyone-labs/agent-skills --local --opencode --skills chrome-extension-architect --skills git-commit-writer --commands
+
+# Install to multiple platforms without gitignore updates
+pnpx @alcyone-labs/agent-skills --global --opencode --gemini --all --no-gitignore
+
+# View all available options
+npx @alcyone-labs/agent-skills --help
 ```
 
 ## Development
