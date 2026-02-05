@@ -1,6 +1,6 @@
 ---
 name: chrome-extension-architect
-description: Privacy-first Chrome Manifest Version 3 extension architect - sidePanel design, MV3 service worker lifecycle, least-privilege permission audits, storage strategy, and cross-browser sidebar patterns.
+description: Privacy-first Chrome Manifest Version 3 extension architect - sidePanel design, MV3 service worker lifecycle, least-privilege permission audits, storage strategy, cross-browser sidebar patterns, and headless Playwright testing.
 references:
   - sidepanel
   - permissions
@@ -9,6 +9,7 @@ references:
   - cross-browser
   - debugging
   - templates
+  - playwright-testing
 ---
 
 # Chrome Extension Manifest Version 3 Privacy-First Architect
@@ -152,6 +153,78 @@ Use this response skeleton for most user questions:
 - **Don’t store full URLs/content unless necessary.** If you must, be explicit about retention and user controls.
 - **Don’t rely on “keep-alive hacks”.** Use real MV3 primitives (`alarms`, message triggers, offscreen documents).
 - **Side panel ≠ popup.** Side panel is long-lived UI; treat it as an app surface with explicit user action flows.
+
+## Testing with Playwright
+
+This skill includes comprehensive headless testing support via Playwright (Chrome 128+).
+
+### When to Use Playwright Testing
+
+- End-to-end extension testing in CI/CD
+- Automated popup/side panel UI testing
+- Content script injection verification
+- Service worker behavior validation
+- Cross-context messaging tests
+
+### Key Testing Capabilities
+
+| Component | Test Approach |
+|-----------|--------------|
+| Popup | Load `chrome-extension://ID/popup.html`, interact with elements |
+| Side Panel | Navigate to panel URL, test UI state |
+| Content Script | Inject into test page, verify DOM changes |
+| Service Worker | Send messages, check storage, test alarms |
+| Full Flows | Multi-step user journeys across all contexts |
+
+### Headless Mode (New in Chrome 128+)
+
+```typescript
+const context = await chromium.launchPersistentContext('', {
+  headless: true,  // Now works with extensions!
+  args: [
+    `--load-extension=${EXTENSION_PATH}`,
+    '--headless=new',  // Required flag
+  ],
+});
+```
+
+### Quick Test Example
+
+```typescript
+import { test, expect } from '@playwright/test';
+import path from 'path';
+
+const EXTENSION_PATH = path.join(__dirname, '../dist');
+
+test('popup displays correctly', async ({ browser }) => {
+  const context = await browser.newContext({
+    args: [
+      `--load-extension=${EXTENSION_PATH}`,
+      `--disable-extensions-except=${EXTENSION_PATH}`,
+    ],
+  });
+  
+  // Get extension ID from service worker
+  let [serviceWorker] = context.serviceWorkers();
+  if (!serviceWorker) {
+    serviceWorker = await context.waitForEvent('serviceworker');
+  }
+  const extensionId = serviceWorker.url().split('/')[2];
+  
+  // Test popup
+  const popup = await context.newPage();
+  await popup.goto(`chrome-extension://${extensionId}/popup.html`);
+  await expect(popup.locator('h1')).toHaveText('My Extension');
+});
+```
+
+### Reference Files
+
+- `references/playwright-testing/README.md` - Overview and decision tree
+- `references/playwright-testing/api.md` - Complete API reference
+- `references/playwright-testing/configuration.md` - Setup and fixtures
+- `references/playwright-testing/patterns.md` - Testing scenarios
+- `references/playwright-testing/gotchas.md` - Pitfalls and workarounds
 
 ## Resources
 

@@ -14,9 +14,10 @@
   "scripts": {
     "build": "tsc",
     "dev": "bun run ./src/installer.ts",
-    "start": "bun run ./dist/installer.js",
+    "start": "node ./dist/installer.js",
     "typecheck": "tsc --noEmit",
-    "prepublishOnly": "npm run build"
+    "prepare": "pnpm run build",
+    "prepublishOnly": "pnpm run build"
   },
   "keywords": [
     "ai",

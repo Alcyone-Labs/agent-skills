@@ -12,6 +12,7 @@ This skill provides elite-level guidance for building modern browser extensions 
 - **Side panel architecture**: Modern Chrome sidePanel API with cross-browser compatibility
 - **Storage strategies**: Choose the right storage for each use case
 - **Debugging playbook**: Fix the most common MV3 extension bugs
+- **Playwright testing**: Headless end-to-end testing for Chrome extensions (Chrome 128+)
 
 ## Installation
 
@@ -94,6 +95,11 @@ Then use:
 - `references/cross-browser/README.md`: Chrome/Edge vs Firefox vs Safari compatibility, feature detection
 - `references/debugging/README.md`: Debugging checklist, common bugs, SW lifecycle debugging
 - `references/templates/README.md`: Copy-paste boilerplate for common patterns
+- `references/playwright-testing/README.md`: Headless testing overview and decision tree
+- `references/playwright-testing/api.md`: Playwright API reference for extension testing
+- `references/playwright-testing/configuration.md`: Test setup, fixtures, and CI/CD config
+- `references/playwright-testing/patterns.md`: Common testing scenarios and flows
+- `references/playwright-testing/gotchas.md`: Testing pitfalls and workarounds
 
 ### Resources
 
@@ -151,6 +157,16 @@ Then use:
 - Storage monitoring
 - Common bug fixes
 
+### 7. Playwright Testing
+
+- **Headless mode** (Chrome 128+): Test extensions without visible browser
+- **Popup testing**: Load and interact with popup UI
+- **Side panel testing**: Test panel functionality
+- **Content script testing**: Verify injection and DOM modifications
+- **Service worker testing**: Test background logic and messaging
+- **CI/CD integration**: GitHub Actions, GitLab CI examples
+- **Complete API reference**: All Playwright APIs for extension testing
+
 ## Privacy Philosophy
 
 This skill emphasizes:
@@ -169,6 +185,9 @@ This skill emphasizes:
 4. "Make my extension work in Firefox too"
 5. "My side panel isn't opening - what's wrong?"
 6. "How do I store large datasets in an extension?"
+7. "How do I test my extension with Playwright?"
+8. "Can I test my extension in headless mode?"
+9. "How do I test content script injection?"
 
 ## File Structure
 

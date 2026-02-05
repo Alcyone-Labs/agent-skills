@@ -630,6 +630,149 @@ chrome.runtime.onMessage.addListener((message) => {
 });
 ```
 
+## Template 9: Playwright Test Setup
+
+Complete Playwright testing setup for Chrome extensions.
+
+### File Structure
+
+```
+my-extension/
+├── e2e/
+│   ├── fixtures/
+│   │   └── extension.ts
+│   ├── tests/
+│   │   └── popup.spec.ts
+│   └── playwright.config.ts
+├── src/
+│   └── ...
+└── package.json
+```
+
+### package.json
+
+```json
+{
+  "scripts": {
+    "test:e2e": "playwright test",
+    "test:e2e:headed": "playwright test --headed",
+    "test:e2e:ui": "playwright test --ui"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.40.0"
+  }
+}
+```
+
+### playwright.config.ts
+
+```typescript
+import { defineConfig, devices } from '@playwright/test';
+import path from 'path';
+
+const EXTENSION_PATH = path.join(__dirname, 'dist');
+
+export default defineConfig({
+  testDir: './e2e/tests',
+  fullyParallel: true,
+  forbidOnly: !!process.env.CI,
+  retries: process.env.CI ? 2 : 0,
+  workers: process.env.CI ? 1 : undefined,
+  reporter: 'html',
+  use: {
+    screenshot: 'only-on-failure',
+    video: 'on-first-retry',
+    trace: 'on-first-retry',
+  },
+  projects: [
+    {
+      name: 'chromium',
+      use: {
+        ...devices['Desktop Chrome'],
+        launchOptions: {
+          args: [
+            `--load-extension=${EXTENSION_PATH}`,
+            `--disable-extensions-except=${EXTENSION_PATH}`,
+          ],
+        },
+      },
+    },
+  ],
+});
+```
+
+### e2e/fixtures/extension.ts
+
+```typescript
+import { test as base, expect, chromium, BrowserContext, Page } from '@playwright/test';
+import path from 'path';
+
+const EXTENSION_PATH = path.join(__dirname, '../../dist');
+
+export interface ExtensionFixtures {
+  context: BrowserContext;
+  extensionId: string;
+  popupPage: Page;
+}
+
+export const test = base.extend<ExtensionFixtures>({
+  context: async ({}, use) => {
+    const context = await chromium.launchPersistentContext('', {
+      headless: false,
+      args: [
+        `--load-extension=${EXTENSION_PATH}`,
+        `--disable-extensions-except=${EXTENSION_PATH}`,
+      ],
+    });
+    await use(context);
+    await context.close();
+  },
+
+  extensionId: async ({ context }, use) => {
+    let [serviceWorker] = context.serviceWorkers();
+    if (!serviceWorker) {
+      serviceWorker = await context.waitForEvent('serviceworker');
+    }
+    const extensionId = serviceWorker.url().split('/')[2];
+    await use(extensionId);
+  },
+
+  popupPage: async ({ context, extensionId }, use) => {
+    const page = await context.newPage();
+    await page.goto(`chrome-extension://${extensionId}/popup.html`);
+    await use(page);
+    await page.close();
+  },
+});
+
+export { expect };
+```
+
+### e2e/tests/popup.spec.ts
+
+```typescript
+import { test, expect } from '../fixtures/extension';
+
+test.describe('Popup', () => {
+  test('displays correctly', async ({ popupPage }) => {
+    await expect(popupPage.locator('h1')).toBeVisible();
+  });
+
+  test('button click works', async ({ popupPage }) => {
+    await popupPage.click('button');
+    await expect(popupPage.locator('.success')).toBeVisible();
+  });
+});
+```
+
+### Installation
+
+```bash
+npm install -D @playwright/test
+npx playwright install chromium
+npm run test:e2e
+```
+
 ## Quick Start Commands
 
 ```bash
@@ -646,6 +789,7 @@ cd my-extension
 # Template 6: Message Port
 # Template 7: Storage Listeners
 # Template 8: Offscreen
+# Template 9: Playwright Testing
 
 # Load in Chrome
 # 1. Open chrome://extensions

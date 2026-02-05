@@ -20,18 +20,20 @@ A curated collection of AI agent skills for professional software development. E
 
 ### One-Line Installation (Recommended)
 
-The fastest way to get started - no cloning required:
+The fastest way to get started - no cloning required. We **strongly recommend using pnpm** (`pnpx`) for better performance, caching, and disk efficiency:
 
 ```bash
-# Using npx (npm)
-npx @alcyone-labs/agent-skills
+# Using pnpx (pnpm) - RECOMMENDED
+pnpx -s @alcyone-labs/agent-skills
 
-# Using pnpx (pnpm)
-pnpx @alcyone-labs/agent-skills
+# Using npx (npm)
+npx --silent @alcyone-labs/agent-skills
 
 # Using bunx (bun)
 bunx @alcyone-labs/agent-skills
 ```
+
+> **Tip:** The `-s` flag for pnpx and `--silent` for npx suppresses postinstall script noise from dependencies, giving you a cleaner output.
 
 This interactive installer will guide you through:
 1. **Installation Scope** - Choose global (~/user space) or local (./project)
@@ -243,18 +245,20 @@ The installer supports various flags for non-interactive or scripted usage:
 ### Examples
 
 ```bash
-# Install all skills globally for OpenCode (non-interactive)
-npx @alcyone-labs/agent-skills --global --opencode --all
+# Install all skills globally for OpenCode (non-interactive) - RECOMMENDED with pnpx
+pnpx -s @alcyone-labs/agent-skills --global --opencode --all
 
 # Install specific skills locally with commands
-npx @alcyone-labs/agent-skills --local --opencode --skills chrome-extension-architect --skills git-commit-writer --commands
+pnpx -s @alcyone-labs/agent-skills --local --opencode --skills chrome-extension-architect --skills git-commit-writer --commands
 
 # Install to multiple platforms without gitignore updates
-pnpx @alcyone-labs/agent-skills --global --opencode --gemini --all --no-gitignore
+pnpx -s @alcyone-labs/agent-skills --global --opencode --gemini --all --no-gitignore
 
 # View all available options
-npx @alcyone-labs/agent-skills --help
+pnpx -s @alcyone-labs/agent-skills --help
 ```
+
+> **Note:** The `-s` (silent) flag suppresses postinstall script output from dependencies. For npm, use `npx --silent` instead.
 
 ## Development
 
