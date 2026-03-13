@@ -1,90 +1,157 @@
-/**
- * Skill discovery and management utilities
- */
-import { readdir, stat, access } from "fs/promises";
+import { access, readdir, stat } from "fs/promises";
 import { join, resolve } from "path";
-/**
- * Discover available skills in the skills directory
- */
-export async function discoverSkills(skillsDir) {
-    const skills = [];
+import { loadSkillManifest } from "./manifest.js";
+import { resolveInstallationLayout } from "./paths.js";
+async function directoryExists(path) {
     try {
-        await access(skillsDir);
+        await access(path);
+        return true;
     }
     catch {
-        return skills;
+        return false;
     }
-    try {
-        const entries = await readdir(skillsDir);
-        for (const entry of entries) {
-            const skillPath = join(skillsDir, entry);
-            const stats = await stat(skillPath);
-            if (stats.isDirectory()) {
-                // Check if it's a valid skill (has SKILL.md or Skill.md)
-                const hasSkillFile = (await access(join(skillPath, "SKILL.md"))
-                    .then(() => true)
-                    .catch(() => false)) ||
-                    (await access(join(skillPath, "Skill.md"))
-                        .then(() => true)
-                        .catch(() => false));
-                if (hasSkillFile) {
-                    // Check if it has commands directory
-                    const hasCommands = await access(join(skillPath, "commands"))
-                        .then(() => true)
-                        .catch(() => false);
-                    skills.push({
-                        name: entry,
-                        path: skillPath,
-                        hasCommands,
-                    });
-                }
-            }
+}
+async function isSkillDirectory(path) {
+    const hasSkillMd = await directoryExists(join(path, "SKILL.md"));
+    if (hasSkillMd) {
+        return true;
+    }
+    return directoryExists(join(path, "Skill.md"));
+}
+export async function discoverSkillsInDirectory(skillsDir, source) {
+    if (!(await directoryExists(skillsDir))) {
+        return [];
+    }
+    const entries = await readdir(skillsDir);
+    const skills = [];
+    for (const entry of entries) {
+        const skillPath = join(skillsDir, entry);
+        const entryStats = await stat(skillPath);
+        if (!entryStats.isDirectory()) {
+            continue;
         }
-    }
-    catch (error) {
-        console.error("Error discovering skills:", error);
+        if (!(await isSkillDirectory(skillPath))) {
+            continue;
+        }
+        const hasCommands = await directoryExists(join(skillPath, "commands"));
+        const { manifestPath, manifest } = await loadSkillManifest(skillPath);
+        skills.push({
+            name: entry,
+            path: skillPath,
+            source,
+            hasCommands,
+            manifestPath,
+            manifest,
+        });
     }
     return skills.sort((a, b) => a.name.localeCompare(b.name));
 }
 /**
- * Get the source directory for skills
- * Detects if running in self-install mode or from a cloned repo
+ * Resolve source skills directory for self-install / local repository mode.
+ * Search current working directory first, then repository-relative fallbacks.
  */
-export async function getSourceDirectory() {
-    // Check if we're running from the installer directory
-    const currentFile = import.meta.url;
-    const currentDir = resolve(new URL(currentFile).pathname, "..", "..", "..", "..");
-    // Check for skills directory at various levels
+export async function getSourceDirectory(cwd = process.cwd()) {
     const possiblePaths = [
-        join(currentDir, "skills"),
-        join(currentDir, "..", "skills"),
-        join(currentDir, "..", "..", "skills"),
-        join(process.cwd(), "skills"),
+        resolve(cwd, "skills"),
+        resolve(new URL(import.meta.url).pathname, "..", "..", "..", "..", "skills"),
+        resolve(new URL(import.meta.url).pathname, "..", "..", "..", "..", "..", "skills"),
     ];
-    for (const path of possiblePaths) {
-        try {
-            await access(path);
-            const stats = await stat(path);
-            if (stats.isDirectory()) {
-                return {
-                    srcDir: resolve(path, ".."),
-                    skillsDir: path,
-                    isSelfInstall: true,
-                };
-            }
-        }
-        catch {
+    for (const candidateSkillsDir of possiblePaths) {
+        if (!(await directoryExists(candidateSkillsDir))) {
             continue;
         }
+        return {
+            srcDir: resolve(candidateSkillsDir, ".."),
+            skillsDir: candidateSkillsDir,
+            isSelfInstall: true,
+        };
     }
-    // No local skills found - will need to fetch from GitHub
     throw new Error("No local skills directory found");
 }
-/**
- * Validate selected skills against available skills
- */
+export async function discoverSourceSkills(cwd = process.cwd()) {
+    try {
+        const source = await getSourceDirectory(cwd);
+        return discoverSkillsInDirectory(source.skillsDir, "source");
+    }
+    catch {
+        return [];
+    }
+}
+export async function discoverInstalledSkills(scope, cwd = process.cwd()) {
+    const layout = resolveInstallationLayout(scope, cwd);
+    return discoverSkillsInDirectory(layout.skillsDir, scope === "local" ? "local" : "global");
+}
+export async function discoverAllSkillsByPrecedence(cwd = process.cwd()) {
+    const [source, localInstalled, globalInstalled] = await Promise.all([
+        discoverSourceSkills(cwd),
+        discoverInstalledSkills("local", cwd),
+        discoverInstalledSkills("global", cwd),
+    ]);
+    const seen = new Set();
+    const ordered = [];
+    for (const group of [source, localInstalled, globalInstalled]) {
+        for (const skill of group) {
+            if (seen.has(skill.name)) {
+                continue;
+            }
+            seen.add(skill.name);
+            ordered.push(skill);
+        }
+    }
+    return ordered;
+}
+export async function discoverAllInstalledSkills(cwd = process.cwd()) {
+    const [localInstalled, globalInstalled] = await Promise.all([
+        discoverInstalledSkills("local", cwd),
+        discoverInstalledSkills("global", cwd),
+    ]);
+    return [...localInstalled, ...globalInstalled];
+}
+export async function findSkillByName(skillName, cwd = process.cwd()) {
+    const skills = await discoverAllSkillsByPrecedence(cwd);
+    return skills.find((skill) => skill.name === skillName) ?? null;
+}
+export async function findInstalledSkillByName(skillName, scope, cwd = process.cwd()) {
+    const installed = await discoverInstalledSkills(scope, cwd);
+    return installed.find((skill) => skill.name === skillName) ?? null;
+}
+async function commandExists(skill, commandName) {
+    return directoryExists(join(skill.path, "bin", commandName));
+}
+async function runtimeReady(skill) {
+    const requiredPaths = skill.manifest.runtime?.requiredPaths ?? [];
+    for (const relativePath of requiredPaths) {
+        if (!(await directoryExists(join(skill.path, relativePath)))) {
+            return false;
+        }
+    }
+    return true;
+}
+export async function findRunnableSkillByName(skillName, commandName, cwd = process.cwd()) {
+    const [source, localInstalled, globalInstalled] = await Promise.all([
+        discoverSourceSkills(cwd),
+        discoverInstalledSkills("local", cwd),
+        discoverInstalledSkills("global", cwd),
+    ]);
+    const candidates = [...source, ...localInstalled, ...globalInstalled].filter((skill) => skill.name === skillName);
+    const commandCandidates = [];
+    for (const candidate of candidates) {
+        if (await commandExists(candidate, commandName)) {
+            commandCandidates.push(candidate);
+        }
+    }
+    if (commandCandidates.length === 0) {
+        return null;
+    }
+    for (const candidate of commandCandidates) {
+        if (await runtimeReady(candidate)) {
+            return candidate;
+        }
+    }
+    return commandCandidates[0] ?? null;
+}
 export function validateSkills(selectedSkills, availableSkills) {
-    const availableNames = new Set(availableSkills.map((s) => s.name));
-    return selectedSkills.filter((name) => availableNames.has(name));
+    const available = new Set(availableSkills.map((skill) => skill.name));
+    return selectedSkills.filter((skill) => available.has(skill));
 }
 //# sourceMappingURL=skill-discovery.js.map

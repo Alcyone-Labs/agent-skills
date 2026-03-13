@@ -1,284 +1,178 @@
 #!/usr/bin/env node
-/**
- * Agent Skills Installer
- *
- * This installer uses promptWhen: "always" which means:
- * - Prompts will ALWAYS show by default
- * - Use flags to pre-configure values and skip specific prompts
- * - Use --help to see all available options
- *
- * Usage:
- *   # Full interactive mode (all prompts)
- *   npx @alcyone-labs/agent-skills
- *
- *   # Pre-configured interactive (skip scope prompt, show others)
- *   npx @alcyone-labs/agent-skills --global
- *
- *   # Pre-configured non-interactive (all flags provided)
- *   npx @alcyone-labs/agent-skills --global --all --gemini --droid
- *
- *   # Mixed mode (pre-set some values, prompt for missing ones)
- *   npx @alcyone-labs/agent-skills --global --gemini
- */
 
-import {
-  ArgParser,
-  type IPromptableFlag,
-  type IHandlerContext,
-} from "@alcyone-labs/arg-parser";
+import { ArgParser, type IHandlerContext } from "@alcyone-labs/arg-parser";
 import { mkdtempSync, rmSync } from "fs";
 import { tmpdir } from "os";
 import { join } from "path";
 import { execSync } from "child_process";
-import { discoverSkills, getSourceDirectory } from "./core/skill-discovery.js";
-import { executeInstallation } from "./core/installer.js";
 import {
-  AVAILABLE_PLATFORMS,
-  DEFAULT_PLATFORM,
-  PLATFORM_CONFIGS,
-  type AgentPlatform,
-  type InstallConfig,
+  cleanInstall,
+  installSkill,
+  pruneInstall,
+  purgeSkill,
+  resetSkill,
+  runSkillCommand,
+  uninstallSkill,
+  updateSkill,
+  validateAllInstalledSkills,
+  validateSkill,
+} from "./core/installer.js";
+import {
+  discoverSkillsInDirectory,
+  discoverSourceSkills,
+  findRunnableSkillByName,
+} from "./core/skill-discovery.js";
+import {
+  AVAILABLE_CLIENTS,
+  type CompatibilityClient,
+  type MutationOptions,
+  type SkillInfo,
 } from "./core/types.js";
 
 const REPO_URL = "https://github.com/Alcyone-Labs/agent-skills.git";
 
-/**
- * Fetch skills from GitHub to a temp directory
- */
-async function fetchFromGitHub(): Promise<{
-  srcDir: string;
-  skillsDir: string;
+type SharedFlags = {
+  local?: boolean;
+  global?: boolean;
+  dryRun?: boolean;
+  commands?: boolean;
+  noCommands?: boolean;
+  client?: string[];
+};
+
+function normalizeScope(args: SharedFlags): MutationOptions["scope"] {
+  if (args.local) {
+    return "local";
+  }
+
+  return "global";
+}
+
+function normalizeCompatibilityClients(values: string[] | undefined): CompatibilityClient[] {
+  if (!values || values.length === 0) {
+    return [];
+  }
+
+  const normalized = values
+    .map((value) => value.trim())
+    .filter((value) => value.length > 0)
+    .map((value) => {
+      const directMatch = AVAILABLE_CLIENTS.find(
+        (client) => client.toLowerCase() === value.toLowerCase(),
+      );
+
+      if (directMatch) {
+        return directMatch;
+      }
+
+      if (value.toLowerCase() === "droid" || value.toLowerCase() === "factory") {
+        return "FactoryAI Droid";
+      }
+
+      throw new Error(`Unsupported compatibility client: ${value}`);
+    });
+
+  return Array.from(new Set(normalized));
+}
+
+function createMutationOptions(args: SharedFlags): MutationOptions {
+  return {
+    scope: normalizeScope(args),
+    dryRun: Boolean(args.dryRun),
+    installCommandAdapters: args.noCommands ? false : Boolean(args.commands),
+    compatibilityClients: normalizeCompatibilityClients(args.client),
+  };
+}
+
+function printOperationResult(
+  action: string,
+  result: {
+    skill: string;
+    scope: string;
+    dryRun: boolean;
+    changedPaths: string[];
+    compatibilityClients?: string[];
+  },
+): void {
+  const mode = result.dryRun ? "[dry-run] " : "";
+  console.log(`${mode}${action}: ${result.skill} (${result.scope})`);
+
+  if (result.compatibilityClients && result.compatibilityClients.length > 0) {
+    console.log(`compatibility exports: ${result.compatibilityClients.join(", ")}`);
+  }
+
+  if (result.changedPaths.length === 0) {
+    console.log("changes: none");
+    return;
+  }
+
+  console.log("changed paths:");
+  for (const changedPath of result.changedPaths) {
+    console.log(`  - ${changedPath}`);
+  }
+}
+
+function preparePositionalSkillArgs(argv: string[]): string[] {
+  if (argv.length === 0) {
+    return argv;
+  }
+
+  if (argv[0].startsWith("-")) {
+    return argv;
+  }
+
+  return ["--skill", argv[0], ...argv.slice(1)];
+}
+
+async function fetchSourceSkillsFromGitHub(): Promise<{
+  skills: SkillInfo[];
   cleanup: () => void;
 }> {
   const tempDir = mkdtempSync(join(tmpdir(), "agent-skills-"));
-
-  console.log("📥 Fetching skills from GitHub...");
 
   try {
     execSync(`git clone --depth 1 --quiet "${REPO_URL}" "${tempDir}"`, {
       stdio: "pipe",
     });
-  } catch (error) {
-    throw new Error(
-      "Failed to fetch skills from GitHub. Please check your internet connection.",
-    );
+  } catch {
+    rmSync(tempDir, { recursive: true, force: true });
+    throw new Error("Failed to fetch skills from GitHub");
   }
 
+  const skillsDir = join(tempDir, "skills");
+  const skills = await discoverSkillsInDirectory(skillsDir, "source");
+
   return {
-    srcDir: tempDir,
-    skillsDir: join(tempDir, "skills"),
+    skills,
     cleanup: () => {
       try {
         rmSync(tempDir, { recursive: true, force: true });
       } catch {
-        // Ignore cleanup errors
+        // Ignore cleanup errors.
       }
     },
   };
 }
 
-/**
- * Check if running from local repository (self-install mode)
- */
-async function isLocalRepository(): Promise<boolean> {
-  try {
-    await getSourceDirectory();
-    return true;
-  } catch {
-    return false;
-  }
-}
-
-/**
- * Get skills source - either local or from GitHub
- */
-async function getSkillsSource(): Promise<{
-  srcDir: string;
-  skillsDir: string;
+async function resolveSourceSkills(): Promise<{
+  skills: SkillInfo[];
   cleanup?: () => void;
-  availableSkills: { name: string; path: string; hasCommands: boolean }[];
 }> {
-  if (await isLocalRepository()) {
-    const localSource = await getSourceDirectory();
-    const availableSkills = await discoverSkills(localSource.skillsDir);
-    return {
-      srcDir: localSource.srcDir,
-      skillsDir: localSource.skillsDir,
-      availableSkills,
-    };
-  } else {
-    const githubSource = await fetchFromGitHub();
-    const availableSkills = await discoverSkills(githubSource.skillsDir);
-    return {
-      srcDir: githubSource.srcDir,
-      skillsDir: githubSource.skillsDir,
-      cleanup: githubSource.cleanup,
-      availableSkills,
-    };
+  const localSource = await discoverSourceSkills();
+  if (localSource.length > 0) {
+    return { skills: localSource };
   }
+
+  return fetchSourceSkillsFromGitHub();
 }
 
-async function main() {
-  // Discover skills FIRST before creating parser
-  // This allows us to populate the skills prompt options
-  let srcDir: string;
-  let skillsDir: string;
-  let cleanup: (() => void) | undefined;
-  let availableSkills: { name: string; path: string; hasCommands: boolean }[];
-
-  try {
-    const source = await getSkillsSource();
-    srcDir = source.srcDir;
-    skillsDir = source.skillsDir;
-    cleanup = source.cleanup;
-    availableSkills = source.availableSkills;
-
-    if (availableSkills.length === 0) {
-      console.error("❌ No skills found");
-      process.exit(1);
-    }
-  } catch (error) {
-    console.error("❌ Failed to load skills:", error);
-    process.exit(1);
-  }
-
-  const parser = new ArgParser({
-    appName: "Agent Skills Installer",
-    appCommandName: "agent-skills",
-    promptWhen: "always",
-    handler: async (ctx: IHandlerContext) => {
-      const args = ctx.args as {
-        interactive?: boolean;
-        global?: boolean;
-        local?: boolean;
-        all?: boolean;
-        opencode?: boolean;
-        gemini?: boolean;
-        claude?: boolean;
-        droid?: boolean;
-        agents?: boolean;
-        antigravity?: boolean;
-        installCommands?: boolean;
-        noCommands?: boolean;
-        gitignore?: boolean;
-        noGitignore?: boolean;
-      };
-
-      // Determine install type
-      let installType: "global" | "local" = "global";
-      if (args.local) {
-        installType = "local";
-      } else if (args.global) {
-        installType = "global";
-      } else if (ctx.promptAnswers?.installType) {
-        installType = ctx.promptAnswers.installType as "global" | "local";
-      }
-
-      // Determine platforms from flags or prompt
-      const hasAgentFlags =
-        args.opencode ||
-        args.gemini ||
-        args.claude ||
-        args.droid ||
-        args.agents ||
-        args.antigravity;
-
-      let platforms: AgentPlatform[] = [];
-      if (hasAgentFlags) {
-        if (args.opencode) platforms.push("OpenCode");
-        if (args.gemini) platforms.push("Gemini CLI");
-        if (args.claude) platforms.push("Claude");
-        if (args.droid) platforms.push("FactoryAI Droid");
-        if (args.agents) platforms.push("Agents");
-        if (args.antigravity) platforms.push("Antigravity");
-      } else if (ctx.promptAnswers?.platforms) {
-        platforms = ctx.promptAnswers.platforms as AgentPlatform[];
-      } else {
-        platforms = [DEFAULT_PLATFORM];
-      }
-
-      // Determine skills from flags or prompt
-      let skills: string[] = [];
-      if (args.all) {
-        skills = availableSkills.map((s) => s.name);
-      } else if (ctx.promptAnswers?.skills) {
-        skills = ctx.promptAnswers.skills as string[];
-      } else {
-        skills = availableSkills.map((s) => s.name);
-      }
-
-      // Determine commands preference
-      let installCommands = false;
-      if (args.noCommands) {
-        installCommands = false;
-      } else if (args.installCommands) {
-        installCommands = true;
-      } else if (ctx.promptAnswers?.installCommands !== undefined) {
-        installCommands = ctx.promptAnswers.installCommands as boolean;
-      }
-
-      // Determine gitignore preference
-      let updateGitignore = false;
-      if (args.noGitignore) {
-        updateGitignore = false;
-      } else if (args.gitignore) {
-        updateGitignore = true;
-      } else if (ctx.promptAnswers?.updateGitignore !== undefined) {
-        updateGitignore = ctx.promptAnswers.updateGitignore as boolean;
-      }
-
-      const config: InstallConfig = {
-        installType,
-        platforms,
-        skills,
-        installCommands,
-        updateGitignore,
-        selfInstall: await isLocalRepository(),
-      };
-
-      // Show summary
-      console.log("\n📋 Installation Summary:");
-      console.log(`  Scope: ${config.installType}`);
-      console.log(`  Platforms: ${config.platforms.join(", ")}`);
-      console.log(`  Skills: ${config.skills.join(", ")}`);
-      console.log(`  Commands: ${config.installCommands ? "Yes" : "No"}`);
-      console.log(`  Update .gitignore: ${config.updateGitignore ? "Yes" : "No"}`);
-      console.log("");
-
-      // Execute installation
-      console.log("🚀 Installing skills...\n");
-
-      const results = await executeInstallation(config, availableSkills, srcDir);
-
-      const successCount = results.filter((r) => r.success).length;
-      const failCount = results.length - successCount;
-
-      if (failCount === 0) {
-        console.log(`\n✅ Installed ${successCount} skill(s) successfully`);
-      } else {
-        console.log(`\n⚠️  Installed ${successCount} skill(s), ${failCount} failed`);
-      }
-
-      // Show detailed results
-      console.log("\n📊 Installation Details:");
-      for (const r of results) {
-        const status = r.success ? "✅" : "❌";
-        const cmd = r.commandInstalled ? " (cmd)" : "";
-        const error = r.error ? ` - ${r.error}` : "";
-        console.log(`  ${status} ${r.skill} → ${r.platform}${cmd}${error}`);
-      }
-
-      console.log("\n🎉 Installation complete!");
-    },
-  });
-
-  // Scope flags
+function createCommonMutationFlags(parser: ArgParser): void {
   parser.addFlag({
     name: "global",
     options: ["--global", "-g"],
     type: "boolean",
     flagOnly: true,
-    description: "Install globally (user space ~/)",
+    description: "Use global install scope (~/.agents)",
   });
 
   parser.addFlag({
@@ -286,74 +180,23 @@ async function main() {
     options: ["--local", "-l"],
     type: "boolean",
     flagOnly: true,
-    description: "Install locally (project ./)",
+    description: "Use local install scope (./.agents)",
   });
 
-  // Agent flags
   parser.addFlag({
-    name: "opencode",
-    options: ["--opencode"],
+    name: "dryRun",
+    options: ["--dry-run"],
     type: "boolean",
     flagOnly: true,
-    description: "Install for OpenCode",
+    description: "Preview actions without changing files",
   });
 
   parser.addFlag({
-    name: "gemini",
-    options: ["--gemini"],
-    type: "boolean",
-    flagOnly: true,
-    description: "Install for Gemini CLI",
-  });
-
-  parser.addFlag({
-    name: "claude",
-    options: ["--claude"],
-    type: "boolean",
-    flagOnly: true,
-    description: "Install for Claude",
-  });
-
-  parser.addFlag({
-    name: "droid",
-    options: ["--droid"],
-    type: "boolean",
-    flagOnly: true,
-    description: "Install for FactoryAI Droid",
-  });
-
-  parser.addFlag({
-    name: "agents",
-    options: ["--agents"],
-    type: "boolean",
-    flagOnly: true,
-    description: "Install for Agents",
-  });
-
-  parser.addFlag({
-    name: "antigravity",
-    options: ["--antigravity"],
-    type: "boolean",
-    flagOnly: true,
-    description: "Install for Antigravity",
-  });
-
-  // Skill selection flags
-  parser.addFlag({
-    name: "all",
-    options: ["--all", "-a"],
-    type: "boolean",
-    flagOnly: true,
-    description: "Install all available skills",
-  });
-
-  // Command installation flags
-  parser.addFlag({
-    name: "installCommands",
+    name: "commands",
     options: ["--commands"],
     type: "boolean",
     flagOnly: true,
-    description: "Install commands for supported agents",
+    description: "Install optional command adapters",
   });
 
   parser.addFlag({
@@ -361,158 +204,474 @@ async function main() {
     options: ["--no-commands"],
     type: "boolean",
     flagOnly: true,
-    description: "Skip installing commands",
-  });
-
-  // Gitignore flags
-  parser.addFlag({
-    name: "gitignore",
-    options: ["--gitignore"],
-    type: "boolean",
-    flagOnly: true,
-    description: "Add agent folders to .gitignore",
+    description: "Skip optional command adapters",
   });
 
   parser.addFlag({
-    name: "noGitignore",
-    options: ["--no-gitignore"],
-    type: "boolean",
-    flagOnly: true,
-    description: "Skip adding to .gitignore",
+    name: "client",
+    options: ["--client", "-c"],
+    type: "array",
+    description: "Compatibility export targets (repeat flag for multiple)",
+  });
+}
+
+function createInstallParser(): ArgParser {
+  const parser = new ArgParser({
+    appName: "Agent Skills",
+    appCommandName: "agent-skills install",
+    handler: async (ctx: IHandlerContext) => {
+      const args = ctx.args as SharedFlags & { all?: boolean; skill?: string };
+      const source = await resolveSourceSkills();
+
+      try {
+        const selectedSkills = args.all
+          ? source.skills
+          : source.skills.filter((skill) => skill.name === args.skill);
+
+        if (selectedSkills.length === 0) {
+          throw new Error(`Skill not found in source set: ${args.skill ?? "(unspecified)"}`);
+        }
+
+        const mutationOptions = createMutationOptions(args);
+        for (const skill of selectedSkills) {
+          const result = await installSkill(skill, mutationOptions);
+          printOperationResult("install", result);
+        }
+      } finally {
+        source.cleanup?.();
+      }
+    },
   });
 
-  // Interactive flag
-  parser.addFlag({
-    name: "interactive",
-    options: ["--interactive", "-i"],
-    type: "boolean",
-    flagOnly: true,
-    description: "Run in interactive mode with prompts",
-  });
+  createCommonMutationFlags(parser);
 
-  // Promptable flags (only shown in interactive mode when values missing)
-
-  // 1. Installation scope prompt
   parser.addFlag({
-    name: "installType",
-    options: ["--install-type"],
+    name: "skill",
+    options: ["--skill", "-s"],
     type: "string",
-    promptSequence: 1,
-    prompt: async (ctx: IHandlerContext) => ({
-      type: "select",
-      message: "Select installation scope:",
-      options: [
-        { label: "Global (user space ~)", value: "global" },
-        { label: "Local (project ./)", value: "local" },
-      ],
-      skip: ctx.args.global || ctx.args.local,
-    }),
-  } as IPromptableFlag);
+    description: "Skill name to install",
+  });
 
-  // 2. Platforms prompt
   parser.addFlag({
-    name: "platforms",
-    options: ["--platforms", "-p"],
-    type: "array",
-    defaultValue: [DEFAULT_PLATFORM],
-    promptSequence: 2,
-    prompt: async (ctx: IHandlerContext) => {
-      const hasAgentFlags =
-        ctx.args.opencode ||
-        ctx.args.gemini ||
-        ctx.args.claude ||
-        ctx.args.droid ||
-        ctx.args.agents ||
-        ctx.args.antigravity;
-
-      return {
-        type: "multiselect",
-        message: "Select agents to install to:",
-        options: AVAILABLE_PLATFORMS.map((p) => ({
-          label: p,
-          value: p,
-          hint: PLATFORM_CONFIGS[p].supportsCommands
-            ? "supports commands"
-            : undefined,
-        })),
-        initial: [DEFAULT_PLATFORM],
-        allowSelectAll: true,
-        skip: hasAgentFlags,
-      };
-    },
-  } as IPromptableFlag);
-
-  // 3. Skills prompt - now with actual skill options
-  parser.addFlag({
-    name: "skills",
-    options: ["--skills", "-s"],
-    type: "array",
-    promptSequence: 3,
-    prompt: async (ctx: IHandlerContext) => ({
-      type: "multiselect",
-      message: "Select skills to install:",
-      options: availableSkills.map((skill) => ({
-        label: skill.name,
-        value: skill.name,
-        hint: skill.hasCommands ? "has commands" : undefined,
-      })),
-      allowSelectAll: true,
-      skip: ctx.args.all,
-    }),
-  } as IPromptableFlag);
-
-  // 4. Commands prompt
-  parser.addFlag({
-    name: "installCommandsPrompt",
-    options: ["--install-commands-prompt"],
+    name: "all",
+    options: ["--all"],
     type: "boolean",
-    defaultValue: false,
-    promptSequence: 4,
-    prompt: async (ctx: IHandlerContext) => ({
-      type: "confirm",
-      message: "Install commands for supported agents?",
-      initial: false,
-      skip:
-        ctx.args.installCommands !== undefined ||
-        ctx.args.noCommands !== undefined,
-    }),
-  } as IPromptableFlag);
+    flagOnly: true,
+    description: "Install all source skills",
+  });
 
-  // 5. Gitignore prompt
-  parser.addFlag({
-    name: "updateGitignorePrompt",
-    options: ["--update-gitignore-prompt"],
-    type: "boolean",
-    defaultValue: false,
-    promptSequence: 5,
-    prompt: async (ctx: IHandlerContext) => {
-      const installType =
-        ctx.promptAnswers?.installType ||
-        (ctx.args.global ? "global" : ctx.args.local ? "local" : "global");
+  return parser;
+}
 
-      return {
-        type: "confirm",
-        message: "Add agent folders to .gitignore?",
-        initial: false,
-        skip:
-          ctx.args.gitignore !== undefined ||
-          ctx.args.noGitignore !== undefined ||
-          installType !== "local",
-      };
+function createUpdateParser(): ArgParser {
+  const parser = new ArgParser({
+    appName: "Agent Skills",
+    appCommandName: "agent-skills update",
+    handler: async (ctx: IHandlerContext) => {
+      const args = ctx.args as SharedFlags & { all?: boolean; skill?: string };
+      const source = await resolveSourceSkills();
+
+      try {
+        const selectedSkills = args.all
+          ? source.skills
+          : source.skills.filter((skill) => skill.name === args.skill);
+
+        if (selectedSkills.length === 0) {
+          throw new Error(`Skill not found in source set: ${args.skill ?? "(unspecified)"}`);
+        }
+
+        const mutationOptions = createMutationOptions(args);
+        for (const skill of selectedSkills) {
+          const result = await updateSkill(skill, mutationOptions);
+          printOperationResult("update", result);
+        }
+      } finally {
+        source.cleanup?.();
+      }
     },
-  } as IPromptableFlag);
+  });
 
-  try {
-    await parser.parse();
-  } finally {
-    // Cleanup temp directory if we fetched from GitHub
-    if (cleanup) {
-      cleanup();
+  createCommonMutationFlags(parser);
+
+  parser.addFlag({
+    name: "skill",
+    options: ["--skill", "-s"],
+    type: "string",
+    description: "Skill name to update",
+  });
+
+  parser.addFlag({
+    name: "all",
+    options: ["--all"],
+    type: "boolean",
+    flagOnly: true,
+    description: "Update all source skills",
+  });
+
+  return parser;
+}
+
+function createResetParser(): ArgParser {
+  const parser = new ArgParser({
+    appName: "Agent Skills",
+    appCommandName: "agent-skills reset",
+    handler: async (ctx: IHandlerContext) => {
+      const args = ctx.args as SharedFlags & { skill?: string };
+      if (!args.skill) {
+        throw new Error("--skill is required");
+      }
+
+      const mutationOptions = createMutationOptions(args);
+      const result = await resetSkill(args.skill, mutationOptions);
+      printOperationResult("reset", result);
+    },
+  });
+
+  createCommonMutationFlags(parser);
+  parser.addFlag({
+    name: "skill",
+    options: ["--skill", "-s"],
+    type: "string",
+    description: "Skill name to reset",
+  });
+
+  return parser;
+}
+
+function createUninstallParser(): ArgParser {
+  const parser = new ArgParser({
+    appName: "Agent Skills",
+    appCommandName: "agent-skills uninstall",
+    handler: async (ctx: IHandlerContext) => {
+      const args = ctx.args as SharedFlags & { skill?: string };
+      if (!args.skill) {
+        throw new Error("--skill is required");
+      }
+
+      const result = await uninstallSkill(args.skill, {
+        scope: normalizeScope(args),
+        dryRun: Boolean(args.dryRun),
+      });
+      printOperationResult("uninstall", result);
+    },
+  });
+
+  parser.addFlag({
+    name: "global",
+    options: ["--global", "-g"],
+    type: "boolean",
+    flagOnly: true,
+    description: "Use global install scope (~/.agents)",
+  });
+
+  parser.addFlag({
+    name: "local",
+    options: ["--local", "-l"],
+    type: "boolean",
+    flagOnly: true,
+    description: "Use local install scope (./.agents)",
+  });
+
+  parser.addFlag({
+    name: "dryRun",
+    options: ["--dry-run"],
+    type: "boolean",
+    flagOnly: true,
+    description: "Preview actions without changing files",
+  });
+
+  parser.addFlag({
+    name: "skill",
+    options: ["--skill", "-s"],
+    type: "string",
+    description: "Skill name to uninstall",
+  });
+
+  return parser;
+}
+
+function createPurgeParser(): ArgParser {
+  const parser = new ArgParser({
+    appName: "Agent Skills",
+    appCommandName: "agent-skills purge",
+    handler: async (ctx: IHandlerContext) => {
+      const args = ctx.args as SharedFlags & { skill?: string };
+      if (!args.skill) {
+        throw new Error("--skill is required");
+      }
+
+      const result = await purgeSkill(args.skill, {
+        scope: normalizeScope(args),
+        dryRun: Boolean(args.dryRun),
+      });
+      printOperationResult("purge", result);
+    },
+  });
+
+  parser.addFlag({
+    name: "global",
+    options: ["--global", "-g"],
+    type: "boolean",
+    flagOnly: true,
+    description: "Use global install scope (~/.agents)",
+  });
+
+  parser.addFlag({
+    name: "local",
+    options: ["--local", "-l"],
+    type: "boolean",
+    flagOnly: true,
+    description: "Use local install scope (./.agents)",
+  });
+
+  parser.addFlag({
+    name: "dryRun",
+    options: ["--dry-run"],
+    type: "boolean",
+    flagOnly: true,
+    description: "Preview actions without changing files",
+  });
+
+  parser.addFlag({
+    name: "skill",
+    options: ["--skill", "-s"],
+    type: "string",
+    description: "Skill name to purge",
+  });
+
+  return parser;
+}
+
+function createValidateParser(): ArgParser {
+  return new ArgParser({
+    appName: "Agent Skills",
+    appCommandName: "agent-skills validate",
+    handler: async (ctx: IHandlerContext) => {
+      const args = ctx.args as { local?: boolean; global?: boolean; skill?: string };
+      const scopes: Array<"local" | "global"> =
+        args.local || args.global ? [normalizeScope(args)] : ["local", "global"];
+      const allIssues = [];
+
+      for (const scope of scopes) {
+        if (args.skill) {
+          const issues = await validateSkill(args.skill, scope);
+          allIssues.push(...issues);
+          continue;
+        }
+
+        const issues = await validateAllInstalledSkills(scope);
+        allIssues.push(...issues);
+      }
+
+      if (allIssues.length === 0) {
+        console.log("validate: no issues found");
+        return;
+      }
+
+      for (const issue of allIssues) {
+        console.log(`${issue.severity.toUpperCase()} ${issue.skill}: ${issue.message}`);
+      }
+
+      const hasErrors = allIssues.some((issue) => issue.severity === "error");
+      if (hasErrors) {
+        process.exitCode = 1;
+      }
+    },
+  })
+    .addFlag({
+      name: "global",
+      options: ["--global", "-g"],
+      type: "boolean",
+      flagOnly: true,
+      description: "Validate global install scope",
+    })
+    .addFlag({
+      name: "local",
+      options: ["--local", "-l"],
+      type: "boolean",
+      flagOnly: true,
+      description: "Validate local install scope",
+    })
+    .addFlag({
+      name: "skill",
+      options: ["--skill", "-s"],
+      type: "string",
+      description: "Validate one installed skill",
+    });
+}
+
+function createPruneParser(): ArgParser {
+  return new ArgParser({
+    appName: "Agent Skills",
+    appCommandName: "agent-skills prune",
+    handler: async (ctx: IHandlerContext) => {
+      const args = ctx.args as { local?: boolean; global?: boolean; dryRun?: boolean };
+      const scopes: Array<"local" | "global"> =
+        args.local || args.global ? [normalizeScope(args)] : ["local", "global"];
+      const dryRun = Boolean(args.dryRun);
+
+      for (const scope of scopes) {
+        const removed = await pruneInstall(scope, dryRun);
+        console.log(`${dryRun ? "[dry-run] " : ""}prune (${scope}): ${removed.length} removed`);
+        for (const removedPath of removed) {
+          console.log(`  - ${removedPath}`);
+        }
+      }
+    },
+  })
+    .addFlag({
+      name: "global",
+      options: ["--global", "-g"],
+      type: "boolean",
+      flagOnly: true,
+      description: "Prune global scope",
+    })
+    .addFlag({
+      name: "local",
+      options: ["--local", "-l"],
+      type: "boolean",
+      flagOnly: true,
+      description: "Prune local scope",
+    })
+    .addFlag({
+      name: "dryRun",
+      options: ["--dry-run"],
+      type: "boolean",
+      flagOnly: true,
+      description: "Preview changes",
+    });
+}
+
+function createCleanParser(): ArgParser {
+  return new ArgParser({
+    appName: "Agent Skills",
+    appCommandName: "agent-skills clean",
+    handler: async (ctx: IHandlerContext) => {
+      const args = ctx.args as { local?: boolean; global?: boolean; dryRun?: boolean };
+      const scopes: Array<"local" | "global"> =
+        args.local || args.global ? [normalizeScope(args)] : ["local", "global"];
+      const dryRun = Boolean(args.dryRun);
+
+      for (const scope of scopes) {
+        const removed = await cleanInstall(scope, dryRun);
+        console.log(`${dryRun ? "[dry-run] " : ""}clean (${scope}): ${removed.length} removed`);
+        for (const removedPath of removed) {
+          console.log(`  - ${removedPath}`);
+        }
+      }
+    },
+  })
+    .addFlag({
+      name: "global",
+      options: ["--global", "-g"],
+      type: "boolean",
+      flagOnly: true,
+      description: "Clean global scope",
+    })
+    .addFlag({
+      name: "local",
+      options: ["--local", "-l"],
+      type: "boolean",
+      flagOnly: true,
+      description: "Clean local scope",
+    })
+    .addFlag({
+      name: "dryRun",
+      options: ["--dry-run"],
+      type: "boolean",
+      flagOnly: true,
+      description: "Preview changes",
+    });
+}
+
+async function runCommand(argv: string[]): Promise<void> {
+  const [verb, ...rest] = argv;
+
+  const isHelp = verb === "help" || verb === "--help" || verb === "-h";
+  if (!verb || isHelp) {
+    console.log("Usage: agent-skills <command> [options]");
+    console.log("");
+    console.log("Commands:");
+    console.log("  install <skill>       Install or reconcile a skill");
+    console.log("  run <skill> <bin>     Execute a skill command");
+    console.log("  validate [skill]      Validate installed skills");
+    console.log("  update [skill]        Update a skill from source");
+    console.log("  uninstall <skill>     Remove installed skill state");
+    console.log("  prune                 Remove dangling links/exports");
+    console.log("  reset <skill>         Rebuild links and runtime");
+    console.log("  clean                 Remove stale tool-owned residue");
+    console.log("  purge <skill>         Uninstall and remove declared external state");
+    process.exitCode = isHelp ? 0 : 1;
+    return;
+  }
+
+  switch (verb) {
+    case "install": {
+      const parser = createInstallParser();
+      await parser.parse([...preparePositionalSkillArgs(rest)]);
+      return;
     }
+    case "update": {
+      const parser = createUpdateParser();
+      await parser.parse([...preparePositionalSkillArgs(rest)]);
+      return;
+    }
+    case "reset": {
+      const parser = createResetParser();
+      await parser.parse([...preparePositionalSkillArgs(rest)]);
+      return;
+    }
+    case "uninstall": {
+      const parser = createUninstallParser();
+      await parser.parse([...preparePositionalSkillArgs(rest)]);
+      return;
+    }
+    case "purge": {
+      const parser = createPurgeParser();
+      await parser.parse([...preparePositionalSkillArgs(rest)]);
+      return;
+    }
+    case "validate": {
+      const parser = createValidateParser();
+      const args = preparePositionalSkillArgs(rest);
+      await parser.parse([...args]);
+      return;
+    }
+    case "prune": {
+      const parser = createPruneParser();
+      await parser.parse([...rest]);
+      return;
+    }
+    case "clean": {
+      const parser = createCleanParser();
+      await parser.parse([...rest]);
+      return;
+    }
+    case "run": {
+      if (rest.length < 2) {
+        throw new Error("Usage: agent-skills run <skill> <skill-bin> [args...]");
+      }
+
+      const [skillName, commandName, ...commandArgs] = rest;
+      const skill = await findRunnableSkillByName(skillName, commandName);
+
+      if (!skill) {
+        throw new Error(`Skill command not found: ${skillName}/${commandName}`);
+      }
+
+      await runSkillCommand(skill, commandName, commandArgs);
+      return;
+    }
+    default:
+      throw new Error(`Unknown command: ${verb}`);
   }
 }
 
+async function main(): Promise<void> {
+  await runCommand(process.argv.slice(2));
+}
+
 main().catch((error) => {
-  console.error("❌ Fatal error:", error);
+  console.error(error instanceof Error ? error.message : String(error));
   process.exit(1);
 });

@@ -1,22 +1,20 @@
+import type { InstallScope, SkillInfo, SkillSource } from "./types.js";
+export declare function discoverSkillsInDirectory(skillsDir: string, source: SkillSource): Promise<SkillInfo[]>;
 /**
- * Skill discovery and management utilities
+ * Resolve source skills directory for self-install / local repository mode.
+ * Search current working directory first, then repository-relative fallbacks.
  */
-import type { SkillInfo } from "./types.js";
-/**
- * Discover available skills in the skills directory
- */
-export declare function discoverSkills(skillsDir: string): Promise<SkillInfo[]>;
-/**
- * Get the source directory for skills
- * Detects if running in self-install mode or from a cloned repo
- */
-export declare function getSourceDirectory(): Promise<{
+export declare function getSourceDirectory(cwd?: string): Promise<{
     srcDir: string;
     skillsDir: string;
     isSelfInstall: boolean;
 }>;
-/**
- * Validate selected skills against available skills
- */
+export declare function discoverSourceSkills(cwd?: string): Promise<SkillInfo[]>;
+export declare function discoverInstalledSkills(scope: InstallScope, cwd?: string): Promise<SkillInfo[]>;
+export declare function discoverAllSkillsByPrecedence(cwd?: string): Promise<SkillInfo[]>;
+export declare function discoverAllInstalledSkills(cwd?: string): Promise<SkillInfo[]>;
+export declare function findSkillByName(skillName: string, cwd?: string): Promise<SkillInfo | null>;
+export declare function findInstalledSkillByName(skillName: string, scope: InstallScope, cwd?: string): Promise<SkillInfo | null>;
+export declare function findRunnableSkillByName(skillName: string, commandName: string, cwd?: string): Promise<SkillInfo | null>;
 export declare function validateSkills(selectedSkills: string[], availableSkills: SkillInfo[]): string[];
 //# sourceMappingURL=skill-discovery.d.ts.map

@@ -1,9 +1,25 @@
 /**
- * Types for the Agent Skills Installer
+ * Core domain types for agent-skills lifecycle management.
  */
 
-/** Supported agent platforms */
-export type AgentPlatform =
+export type InstallScope = "global" | "local";
+
+export type SkillSource = "source" | "local" | "global";
+
+export type LifecycleVerb =
+  | "install"
+  | "run"
+  | "validate"
+  | "update"
+  | "uninstall"
+  | "prune"
+  | "reset"
+  | "clean"
+  | "purge";
+
+export type RuntimeStrategy = "none" | "npm-in-skill";
+
+export type CompatibilityClient =
   | "OpenCode"
   | "Gemini CLI"
   | "Claude"
@@ -11,97 +27,82 @@ export type AgentPlatform =
   | "Agents"
   | "Antigravity";
 
-/** Platform configuration with normalized folder names */
-export interface PlatformConfig {
-  name: AgentPlatform;
+export interface CommandAdapterConfig {
+  globalDir: string;
+  localDir: string;
+  extension: ".md" | ".toml";
+}
+
+export interface ClientConfig {
+  name: CompatibilityClient;
   folderName: string;
-  globalPath: string;
-  localPath: string;
-  supportsCommands: boolean;
-  commandPath?: string;
-  localCommandPath?: string;
+  supportsAgentsAlias: boolean;
+  globalSkillDir: string;
+  localSkillDir: string;
+  commandAdapter?: CommandAdapterConfig;
 }
 
-/** Skill information */
-export interface SkillInfo {
-  name: string;
-  path: string;
-  hasCommands: boolean;
-}
-
-/** Installation configuration */
-export interface InstallConfig {
-  installType: "global" | "local";
-  platforms: AgentPlatform[];
-  skills: string[];
-  installCommands: boolean;
-  updateGitignore: boolean;
-  selfInstall: boolean;
-}
-
-/** Installation result */
-export interface InstallResult {
-  platform: AgentPlatform;
-  skill: string;
-  success: boolean;
-  commandInstalled?: boolean;
-  error?: string;
-}
-
-/** Platform configurations mapping */
-export const PLATFORM_CONFIGS: Record<AgentPlatform, PlatformConfig> = {
+export const CLIENT_CONFIGS: Record<CompatibilityClient, ClientConfig> = {
   OpenCode: {
     name: "OpenCode",
     folderName: "opencode",
-    globalPath: "~/.config/opencode/skills",
-    localPath: ".opencode/skills",
-    supportsCommands: true,
-    commandPath: "~/.config/opencode/commands",
-    localCommandPath: ".opencode/commands",
+    supportsAgentsAlias: false,
+    globalSkillDir: "~/.config/opencode/skills",
+    localSkillDir: ".opencode/skills",
+    commandAdapter: {
+      globalDir: "~/.config/opencode/commands",
+      localDir: ".opencode/commands",
+      extension: ".md",
+    },
   },
   "Gemini CLI": {
     name: "Gemini CLI",
     folderName: "gemini",
-    globalPath: "~/.gemini/skills",
-    localPath: ".gemini/skills",
-    supportsCommands: true,
-    commandPath: "~/.gemini/commands",
-    localCommandPath: ".gemini/commands",
+    supportsAgentsAlias: true,
+    globalSkillDir: "~/.gemini/skills",
+    localSkillDir: ".gemini/skills",
+    commandAdapter: {
+      globalDir: "~/.gemini/commands",
+      localDir: ".gemini/commands",
+      extension: ".toml",
+    },
   },
   Claude: {
     name: "Claude",
     folderName: "claude",
-    globalPath: "~/.claude/skills",
-    localPath: ".claude/skills",
-    supportsCommands: false,
+    supportsAgentsAlias: false,
+    globalSkillDir: "~/.claude/skills",
+    localSkillDir: ".claude/skills",
   },
   "FactoryAI Droid": {
     name: "FactoryAI Droid",
     folderName: "droid",
-    globalPath: "~/.factory/skills",
-    localPath: ".factory/skills",
-    supportsCommands: true,
-    commandPath: "~/.factory/commands",
-    localCommandPath: ".factory/commands",
+    supportsAgentsAlias: false,
+    globalSkillDir: "~/.factory/skills",
+    localSkillDir: ".factory/skills",
+    commandAdapter: {
+      globalDir: "~/.factory/commands",
+      localDir: ".factory/commands",
+      extension: ".md",
+    },
   },
   Agents: {
     name: "Agents",
     folderName: "agents",
-    globalPath: "~/.config/agents/skills",
-    localPath: ".agents/skills",
-    supportsCommands: false,
+    supportsAgentsAlias: true,
+    globalSkillDir: "~/.agents/skills",
+    localSkillDir: ".agents/skills",
   },
   Antigravity: {
     name: "Antigravity",
     folderName: "antigravity",
-    globalPath: "~/.antigravity/skills",
-    localPath: ".antigravity/skills",
-    supportsCommands: false,
+    supportsAgentsAlias: false,
+    globalSkillDir: "~/.antigravity/skills",
+    localSkillDir: ".antigravity/skills",
   },
 };
 
-/** Available agent platforms */
-export const AVAILABLE_PLATFORMS: AgentPlatform[] = [
+export const AVAILABLE_CLIENTS: CompatibilityClient[] = [
   "OpenCode",
   "Gemini CLI",
   "Claude",
@@ -110,5 +111,83 @@ export const AVAILABLE_PLATFORMS: AgentPlatform[] = [
   "Antigravity",
 ];
 
-/** Default platform when none selected */
-export const DEFAULT_PLATFORM: AgentPlatform = "Agents";
+/**
+ * Default compatibility exports used when no explicit clients are requested.
+ * Claude Code currently needs compatibility export because it does not consume
+ * ~/.agents/skills directly.
+ */
+export const DEFAULT_COMPATIBILITY_CLIENTS: CompatibilityClient[] = ["Claude"];
+
+export interface RuntimeConfig {
+  strategy: RuntimeStrategy;
+  installCommand?: string[];
+  requiredPaths?: string[];
+}
+
+export interface ConfigCheck {
+  id: string;
+  description: string;
+  kind: "env" | "path";
+  value: string;
+  severity?: "warning" | "error";
+}
+
+export interface ValidateConfig {
+  requiredPaths?: string[];
+  configChecks?: ConfigCheck[];
+}
+
+export interface PurgeConfig {
+  externalPaths?: string[];
+}
+
+export interface CompatibilityConfig {
+  clients?: CompatibilityClient[];
+  symlink?: boolean;
+}
+
+export interface SkillManifest {
+  schemaVersion: 1;
+  exportedCommands: string[];
+  runtime?: RuntimeConfig;
+  compatibility?: CompatibilityConfig;
+  validate?: ValidateConfig;
+  purge?: PurgeConfig;
+}
+
+export interface SkillInfo {
+  name: string;
+  path: string;
+  source: SkillSource;
+  hasCommands: boolean;
+  manifestPath: string | null;
+  manifest: SkillManifest;
+}
+
+export interface InstallationLayout {
+  scope: InstallScope;
+  agentsRoot: string;
+  skillsDir: string;
+  binDir: string;
+}
+
+export interface MutationOptions {
+  scope: InstallScope;
+  dryRun: boolean;
+  installCommandAdapters: boolean;
+  compatibilityClients: CompatibilityClient[];
+}
+
+export interface ValidationIssue {
+  skill: string;
+  severity: "warning" | "error";
+  message: string;
+}
+
+export interface OperationResult {
+  skill: string;
+  scope: InstallScope;
+  changedPaths: string[];
+  dryRun: boolean;
+  compatibilityClients: CompatibilityClient[];
+}

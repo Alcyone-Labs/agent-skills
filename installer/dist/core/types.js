@@ -1,59 +1,66 @@
 /**
- * Types for the Agent Skills Installer
+ * Core domain types for agent-skills lifecycle management.
  */
-/** Platform configurations mapping */
-export const PLATFORM_CONFIGS = {
+export const CLIENT_CONFIGS = {
     OpenCode: {
         name: "OpenCode",
         folderName: "opencode",
-        globalPath: "~/.config/opencode/skills",
-        localPath: ".opencode/skills",
-        supportsCommands: true,
-        commandPath: "~/.config/opencode/commands",
-        localCommandPath: ".opencode/commands",
+        supportsAgentsAlias: false,
+        globalSkillDir: "~/.config/opencode/skills",
+        localSkillDir: ".opencode/skills",
+        commandAdapter: {
+            globalDir: "~/.config/opencode/commands",
+            localDir: ".opencode/commands",
+            extension: ".md",
+        },
     },
     "Gemini CLI": {
         name: "Gemini CLI",
         folderName: "gemini",
-        globalPath: "~/.gemini/skills",
-        localPath: ".gemini/skills",
-        supportsCommands: true,
-        commandPath: "~/.gemini/commands",
-        localCommandPath: ".gemini/commands",
+        supportsAgentsAlias: true,
+        globalSkillDir: "~/.gemini/skills",
+        localSkillDir: ".gemini/skills",
+        commandAdapter: {
+            globalDir: "~/.gemini/commands",
+            localDir: ".gemini/commands",
+            extension: ".toml",
+        },
     },
     Claude: {
         name: "Claude",
         folderName: "claude",
-        globalPath: "~/.claude/skills",
-        localPath: ".claude/skills",
-        supportsCommands: false,
+        supportsAgentsAlias: false,
+        globalSkillDir: "~/.claude/skills",
+        localSkillDir: ".claude/skills",
     },
     "FactoryAI Droid": {
         name: "FactoryAI Droid",
         folderName: "droid",
-        globalPath: "~/.factory/skills",
-        localPath: ".factory/skills",
-        supportsCommands: true,
-        commandPath: "~/.factory/commands",
-        localCommandPath: ".factory/commands",
+        supportsAgentsAlias: false,
+        globalSkillDir: "~/.factory/skills",
+        localSkillDir: ".factory/skills",
+        commandAdapter: {
+            globalDir: "~/.factory/commands",
+            localDir: ".factory/commands",
+            extension: ".md",
+        },
     },
     Agents: {
         name: "Agents",
         folderName: "agents",
-        globalPath: "~/.config/agents/skills",
-        localPath: ".agents/skills",
-        supportsCommands: false,
+        supportsAgentsAlias: true,
+        globalSkillDir: "~/.agents/skills",
+        localSkillDir: ".agents/skills",
     },
     Antigravity: {
         name: "Antigravity",
         folderName: "antigravity",
-        globalPath: "~/.antigravity/skills",
-        localPath: ".antigravity/skills",
-        supportsCommands: false,
+        supportsAgentsAlias: false,
+        globalSkillDir: "~/.antigravity/skills",
+        localSkillDir: ".antigravity/skills",
     },
 };
-/** Available agent platforms */
-export const AVAILABLE_PLATFORMS = [
+export const AVAILABLE_CLIENTS = [
     "OpenCode",
     "Gemini CLI",
     "Claude",
@@ -61,6 +68,10 @@ export const AVAILABLE_PLATFORMS = [
     "Agents",
     "Antigravity",
 ];
-/** Default platform when none selected */
-export const DEFAULT_PLATFORM = "Agents";
+/**
+ * Default compatibility exports used when no explicit clients are requested.
+ * Claude Code currently needs compatibility export because it does not consume
+ * ~/.agents/skills directly.
+ */
+export const DEFAULT_COMPATIBILITY_CLIENTS = ["Claude"];
 //# sourceMappingURL=types.js.map
