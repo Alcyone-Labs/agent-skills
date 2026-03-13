@@ -1,0 +1,37 @@
+{
+  "schemaVersion": 1,
+  "exportedCommands": [
+    "exa-search",
+    "exa-code",
+    "exa-company",
+    "exa-crawl",
+    "exa-set-key",
+    "exa-get-key",
+    "exa-mcp-config"
+  ],
+  "runtime": {
+    "strategy": "none"
+  },
+  "validate": {
+    "requiredPaths": [
+      "bin/exa-search",
+      "bin/exa-code",
+      "bin/exa-company",
+      "bin/exa-crawl",
+      "search.cjs",
+      "exa-utils.cjs"
+    ],
+    "configChecks": [
+      {
+        "id": "exa-api-key-env",
+        "description": "EXA_API_KEY is set for this session (keychain/file-based keys still work)",
+        "kind": "env",
+        "value": "EXA_API_KEY",
+        "severity": "warning"
+      }
+    ]
+  },
+  "purge": {
+    "externalPaths": []
+  }
+}
