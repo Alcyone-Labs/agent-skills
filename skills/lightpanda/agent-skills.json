@@ -1,0 +1,33 @@
+{
+  "schemaVersion": 1,
+  "exportedCommands": [
+    "lightpanda-start",
+    "lightpanda-stop",
+    "lightpanda-fetch",
+    "lightpanda-structured",
+    "lightpanda-interactive",
+    "lightpanda-semantic"
+  ],
+  "runtime": {
+    "strategy": "npm-in-skill",
+    "installCommand": [
+      "bash",
+      "scripts/provision-runtime.sh"
+    ],
+    "requiredPaths": [
+      "runtime/browser/lightpanda",
+      "node_modules/playwright-core/package.json"
+    ]
+  },
+  "validate": {
+    "requiredPaths": [
+      "bin/lightpanda-start",
+      "bin/lightpanda-stop",
+      "start.sh",
+      "stop.sh"
+    ]
+  },
+  "purge": {
+    "externalPaths": []
+  }
+}
