@@ -16,6 +16,7 @@
     "dev": "bun run ./src/installer.ts",
     "start": "node ./dist/installer.js",
     "typecheck": "tsc --noEmit",
+    "test": "npm run build && node --test dist/core/lifecycle.test.js",
     "prepare": "pnpm run build",
     "prepublishOnly": "pnpm run build"
   },
