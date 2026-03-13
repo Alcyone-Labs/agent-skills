@@ -70,6 +70,46 @@ function unwrapToolArgs(value) {
     }
     return value;
 }
+function terminalTextWidth() {
+    const columns = process.stdout.columns ?? 100;
+    return Math.max(60, Math.min(columns, 120));
+}
+function wrapText(text, width) {
+    const normalized = text.replace(/\s+/g, " ").trim();
+    if (normalized.length === 0) {
+        return [""];
+    }
+    const words = normalized.split(" ");
+    const lines = [];
+    let currentLine = "";
+    for (const word of words) {
+        const nextLine = currentLine.length === 0 ? word : `${currentLine} ${word}`;
+        if (nextLine.length <= width || currentLine.length === 0) {
+            currentLine = nextLine;
+            continue;
+        }
+        lines.push(currentLine);
+        currentLine = word;
+    }
+    if (currentLine.length > 0) {
+        lines.push(currentLine);
+    }
+    return lines;
+}
+function printWrappedBlock(label, text, indent) {
+    const lines = wrapText(`${label}${text}`, terminalTextWidth() - indent.length);
+    for (const line of lines) {
+        console.log(`${indent}${line}`);
+    }
+}
+function printCatalogEntry(entry, prefix = "") {
+    console.log(`${prefix}${entry.name}`);
+    printWrappedBlock("", entry.description ?? "(no description)", "  ");
+}
+function printSearchResult(result, index) {
+    printCatalogEntry(result.skill, `${index + 1}. `);
+    printWrappedBlock("Why: ", result.reasons.join("; "), "   ");
+}
 function printOperationResult(action, result) {
     const mode = result.dryRun ? "[dry-run] " : "";
     console.log(`${mode}${action}: ${result.skill} (${result.scope})`);
@@ -84,12 +124,6 @@ function printOperationResult(action, result) {
     for (const changedPath of result.changedPaths) {
         console.log(`  - ${changedPath}`);
     }
-}
-function requireStringArg(name, value) {
-    if (!value) {
-        throw new Error(`--${name} is required`);
-    }
-    return value;
 }
 function findSourceSkillByName(skills, skillName) {
     const skill = skills.find((candidate) => candidate.name === skillName);
@@ -205,21 +239,23 @@ function createCommonMutationFlags(parser) {
         description: "Compatibility export targets (repeat flag for multiple)",
     });
 }
-function addSkillFlag(parser, description) {
+function addSkillFlag(parser, description, mandatory) {
     parser.addFlag({
         name: "skill",
         options: ["--skill", "-s"],
         type: "string",
         description,
+        mandatory,
     });
 }
 function addCommandInvocationFlags(parser) {
-    addSkillFlag(parser, "Skill name");
+    addSkillFlag(parser, "Skill name", true);
     parser.addFlag({
         name: "command",
         options: ["--command"],
         type: "string",
         description: "Exported command name",
+        mandatory: true,
     });
     parser.addFlag({
         name: "arg",
@@ -238,9 +274,7 @@ function createInstallParser() {
             const args = ctx.args;
             const mutationOptions = createMutationOptions(args);
             await withResolvedSourceSkills(async (skills) => {
-                const selectedSkills = args.all
-                    ? skills
-                    : [findSourceSkillByName(skills, requireStringArg("skill", args.skill))];
+                const selectedSkills = args.all ? skills : [findSourceSkillByName(skills, args.skill)];
                 for (const skill of selectedSkills) {
                     const result = await installSkill(skill, mutationOptions);
                     printOperationResult("install", result);
@@ -249,7 +283,7 @@ function createInstallParser() {
         },
     });
     createCommonMutationFlags(parser);
-    addSkillFlag(parser, "Skill name to install");
+    addSkillFlag(parser, "Skill name to install", (parsedArgs) => !Boolean(parsedArgs.all));
     parser.addFlag({
         name: "all",
         options: ["--all"],
@@ -271,8 +305,11 @@ function createListParser() {
                     console.log("No source skills found.");
                     return;
                 }
-                for (const entry of entries) {
-                    console.log(`${entry.name}: ${entry.description ?? "(no description)"}`);
+                for (const [index, entry] of entries.entries()) {
+                    if (index > 0) {
+                        console.log("");
+                    }
+                    printCatalogEntry(entry);
                 }
             });
         },
@@ -285,17 +322,18 @@ function createFindParser() {
         description: "Find the most relevant source skills for a free-text request",
         handler: async (ctx) => {
             const args = ctx.args;
-            const query = requireStringArg("query", args.query);
             const limit = args.limit ?? DEFAULT_FIND_LIMIT;
             await withResolvedSourceSkills(async (skills) => {
-                const results = searchCatalogSkills(skills, query, { limit });
+                const results = searchCatalogSkills(skills, args.query, { limit });
                 if (results.length === 0) {
                     console.log("No matching source skills found.");
                     return;
                 }
                 for (const [index, result] of results.entries()) {
-                    console.log(`${index + 1}. ${result.skill.name}: ${result.skill.description ?? "(no description)"}`);
-                    console.log(`   reasons: ${result.reasons.join("; ")}`);
+                    if (index > 0) {
+                        console.log("");
+                    }
+                    printSearchResult(result, index);
                 }
             });
         },
@@ -305,6 +343,7 @@ function createFindParser() {
         options: ["--query", "-q"],
         type: "string",
         description: "Free-text request to match against source skills",
+        mandatory: true,
     });
     parser.addFlag({
         name: "limit",
@@ -321,8 +360,8 @@ function createUseParser() {
         description: "Run a source skill command without installing it permanently",
         handler: async (ctx) => {
             const args = ctx.args;
-            const skillName = requireStringArg("skill", args.skill);
-            const commandName = requireStringArg("command", args.command);
+            const skillName = args.skill;
+            const commandName = args.command;
             const commandArgs = normalizeStringArray(args.arg);
             await withResolvedSourceSkills(async (skills) => {
                 const skill = findSourceSkillByName(skills, skillName);
@@ -343,8 +382,8 @@ function createRunParser() {
         description: "Execute an installed or runnable skill command",
         handler: async (ctx) => {
             const args = ctx.args;
-            const skillName = requireStringArg("skill", args.skill);
-            const commandName = requireStringArg("command", args.command);
+            const skillName = args.skill;
+            const commandName = args.command;
             const commandArgs = normalizeStringArray(args.arg);
             const skill = await findRunnableSkillByName(skillName, commandName);
             if (!skill) {
@@ -365,9 +404,7 @@ function createUpdateParser() {
             const args = ctx.args;
             const mutationOptions = createMutationOptions(args);
             await withResolvedSourceSkills(async (skills) => {
-                const selectedSkills = args.all
-                    ? skills
-                    : [findSourceSkillByName(skills, requireStringArg("skill", args.skill))];
+                const selectedSkills = args.all ? skills : [findSourceSkillByName(skills, args.skill)];
                 for (const skill of selectedSkills) {
                     const result = await updateSkill(skill, mutationOptions);
                     printOperationResult("update", result);
@@ -376,7 +413,7 @@ function createUpdateParser() {
         },
     });
     createCommonMutationFlags(parser);
-    addSkillFlag(parser, "Skill name to update");
+    addSkillFlag(parser, "Skill name to update", (parsedArgs) => !Boolean(parsedArgs.all));
     parser.addFlag({
         name: "all",
         options: ["--all"],
@@ -394,12 +431,12 @@ function createResetParser() {
         handler: async (ctx) => {
             const args = ctx.args;
             const mutationOptions = createMutationOptions(args);
-            const result = await resetSkill(requireStringArg("skill", args.skill), mutationOptions);
+            const result = await resetSkill(args.skill, mutationOptions);
             printOperationResult("reset", result);
         },
     });
     createCommonMutationFlags(parser);
-    addSkillFlag(parser, "Skill name to reset");
+    addSkillFlag(parser, "Skill name to reset", true);
     return parser;
 }
 function createUninstallParser() {
@@ -409,7 +446,7 @@ function createUninstallParser() {
         description: "Remove installed skill state from a scope",
         handler: async (ctx) => {
             const args = ctx.args;
-            const result = await uninstallSkill(requireStringArg("skill", args.skill), {
+            const result = await uninstallSkill(args.skill, {
                 scope: normalizeScope(args),
                 dryRun: Boolean(args.dryRun),
             });
@@ -418,7 +455,7 @@ function createUninstallParser() {
     });
     addScopeFlags(parser);
     addDryRunFlag(parser);
-    addSkillFlag(parser, "Skill name to uninstall");
+    addSkillFlag(parser, "Skill name to uninstall", true);
     return parser;
 }
 function createPurgeParser() {
@@ -428,7 +465,7 @@ function createPurgeParser() {
         description: "Uninstall a skill and remove its declared external state",
         handler: async (ctx) => {
             const args = ctx.args;
-            const result = await purgeSkill(requireStringArg("skill", args.skill), {
+            const result = await purgeSkill(args.skill, {
                 scope: normalizeScope(args),
                 dryRun: Boolean(args.dryRun),
             });
@@ -437,7 +474,7 @@ function createPurgeParser() {
     });
     addScopeFlags(parser);
     addDryRunFlag(parser);
-    addSkillFlag(parser, "Skill name to purge");
+    addSkillFlag(parser, "Skill name to purge", true);
     return parser;
 }
 function createValidateParser() {

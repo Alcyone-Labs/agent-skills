@@ -59,7 +59,7 @@ test("installer CLI list shows source skill descriptions", async () => {
         });
         const result = runCli(["list"], workspace, homeDir);
         assert.equal(result.status, 0, result.stderr);
-        assert.match(result.stdout, /demo: Demo source skill description\./);
+        assert.match(result.stdout, /demo\n\s+Demo source skill description\./);
     }
     finally {
         await rm(workspace, { recursive: true, force: true });
@@ -80,8 +80,21 @@ test("installer CLI find ranks relevant skills from free text", async () => {
         });
         const result = runCli(["find", "browser", "markdown", "--limit", "2"], workspace, homeDir);
         assert.equal(result.status, 0, result.stderr);
-        assert.match(result.stdout, /1\. browser-demo:/);
-        assert.match(result.stdout, /reasons:/);
+        assert.match(result.stdout, /1\. browser-demo\n\s+Browser markdown extraction and semantic tree capture\./);
+        assert.match(result.stdout, /Why: /);
+    }
+    finally {
+        await rm(workspace, { recursive: true, force: true });
+    }
+});
+test("installer CLI missing required flags is handled by parser validation", async () => {
+    const workspace = await mkdtemp(join(tmpdir(), "agent-skills-mandatory-"));
+    const homeDir = join(workspace, "home");
+    try {
+        const result = runCli(["use"], workspace, homeDir);
+        assert.notEqual(result.status, 0);
+        assert.match(result.stderr, /Missing mandatory flags: skill, command/);
+        assert.doesNotMatch(result.stderr, /--skill is required/);
     }
     finally {
         await rm(workspace, { recursive: true, force: true });
