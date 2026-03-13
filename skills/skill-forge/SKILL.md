@@ -9,90 +9,44 @@ references:
 
 # SkillForge
 
-Expert AgentSkills.io architect. ONLY create, refine, package perfect custom Skills per official guidelines. Capture elite knowledge in references/.
+Expert Agent Skills architect. Build portable, self-contained skills with open-standard layout first. Agent-specific adapters are optional compatibility layers.
 
 ## When to Apply
 
-- User: "build a skill for X" "create skill about Y" "distill current session into a skill" "turn agent into skill" "package as skill"
-- Extract nuanced facts/patterns too dense for single manifest
+- User asks to create, refine, or package a skill.
+- User asks to turn current session knowledge into a reusable skill.
+- User asks to modernize existing skills to portable `bin/` + manifest model.
 
-## Non-Negotiable, Golden Rules
+## Non-Negotiable Rules
 
-- Target directory: `./skills/` by default.
-- Additive behavior: ALWAYS preserve existing skills and commands in `./skills/`. DO NOT overwrite other skills.
-- Structure:
-  - `skills/skill-forge/SKILL.md` (CAPITALIZED)
-  - `skills/skill-forge/README.md`
-  - `skills/skill-forge/commands/opencode/skill-forge.md`
-  - `skills/skill-forge/commands/gemini/skill-forge.toml`
-  - `skills/skill-forge/commands/droid/skill-forge.md`
-  - `skills/skill-forge/install.sh` (Single root installer for ALL skills)
-- Folder: kebab-case.
-- SKILL.md YAML first: name, description, references[].
-- NO lowercase skill.md, NO colons in description.
-- references/ MANDATORY: README.md, api.md, configuration.md, patterns.md, gotchas.md per topic.
-- commands/
-  - opencode/{skill-name}.md (OpenCode slash command)
-  - gemini/{skill-name}.toml (Gemini CLI command)
-  - droid/{skill-name}.md (FactoryAI Droid command)
-- install.sh MUST be a copy of `references/install-script/template.sh`. ONLY update the `REPO_URL` constant.
-- Supports `--self`, `--global`/`--local`.
-- Supports selective flags: `--opencode`, `--gemini`, `--claude`, `--droid` (`--factory`), `--agents`, `--antigravity`.
-- Defaults to interactive mode if no flags are provided.
-- Interactive mode prompts for scope (Global/Local), agent selection (toggle menu), and skill selection (toggle menu).
-- Automatically scans `skill/` directory for available skills.
-- Uses dynamic `PROJECT_NAME` based on directory if not set.
-- Interactive mode prompts to update `.gitignore` for local installs.
-- Verbatim APIs/configs from docs.
-- Examples: 2-3 input/output clusters.
-- Max info density: bullets > paragraphs, sacrifice grammar for facts.
+- Target directory defaults to `./skills/`.
+- Additive behavior: never overwrite unrelated skills.
+- Canonical skill package shape:
+  - `skills/<skill>/SKILL.md`
+  - `skills/<skill>/agent-skills.json`
+  - `skills/<skill>/bin/<command>` (user-facing commands)
+  - `skills/<skill>/scripts/*` (internal helpers, optional)
+  - `skills/<skill>/README.md`
+  - `skills/<skill>/references/**`
+- `commands/` is optional compatibility only (`opencode`, `gemini`, `droid`), not required for installability.
+- Per-skill `install.sh` MUST be thin wrapper delegating to `agent-skills install <skill>`.
+- Use relative path resolution from skill root. No hardcoded absolute repository paths.
+- Keep runtime ownership self-contained under installed skill directory when possible.
+- `SKILL.md` frontmatter must stay valid YAML and include `name`, `description`, `references`.
 
-## Workflow Decision Tree
+## Workflow
 
-```
-Request: create or refine skill for [topic]
-A. Clarify scope
-   - skill name, repo URL, target platforms
-   - check if ./skill-forge exists; prepare for additive update
-B. Research
-   - APIs, configs, lifecycle, known issues
-C. Design
-   - description (<=200 chars, no colons)
-   - references/{topic} layout
-D. Write references/ under skill-forge/skill/{skill-name}/
-   - README.md: overview, when to use, decision tree
-   - api.md: verbatim signatures/types
-   - configuration.md: schemas/keys/wiring
-   - patterns.md: multi-step implementations
-   - gotchas.md: pitfalls/limitations
-E. Assemble under ./skills/
-   - {skill-name}/SKILL.md: YAML + rules + workflow + examples
-   - {skill-name}/README.md: High-level overview
-  - commands/opencode/{skill-name}.md: OpenCode command template
-  - commands/gemini/{skill-name}.toml: Gemini CLI command template
-  - commands/droid/{skill-name}.md: FactoryAI Droid command template
-   - install.sh: Multi-Skill Installer Pattern (Update or create at root)
-Result: Updated ./skills/ tree with new skill/command added
-```
+1. Clarify scope (skill name, intended commands, runtime needs).
+2. Research APIs and verify examples against official docs.
+3. Define `agent-skills.json` (exported commands, runtime strategy, validate/purge metadata).
+4. Build command surface in `bin/`; keep internal logic in `scripts/`.
+5. Add/refresh `README.md` and focused `references/` docs.
+6. Add optional `commands/` adapters only when target client needs them.
+7. Add thin `install.sh` wrapper delegating to installer CLI.
 
-## References
+## Output Expectations
 
-- **references/core-structure/README.md**: Folder layout, SKILL.md YAML schema, command format. Provides the skeleton every skill must follow. Check before creating new skills.
-- **references/build-patterns/README.md**: When to split references/, 5-file topic set, A-E workflow, best practices. Prevents bloated SKILL.md and ensures consistent structure.
-- **references/install-script/template.sh**: Multi-Skill Installer Template. Supports interactive mode, selective agent targeting, and gitignore updates. MUST use as base for all generated `install.sh` files (update `REPO_URL`).
-
-## Examples
-
-**Input:** Build skill for Chrome MV3 extensions  
-**Output:** skill/chrome-mv3/
-
-- SKILL.md: workflow for manifest service workers
-- references/mv3-lifecycle/README.md: decision tree
-- references/mv3-lifecycle/api.md: chrome.runtime.onInstalled etc
-- references/persistent-storage/gotchas.md: no persistent globals
-
-**Input:** Package TypeScript skill with install  
-**Output:** Generated install.sh using the Multi-Skill Installer Template from references/install-script/template.sh. Supports `--self`, `--global`, `--local`, and selective flags like `--claude`.
-
-**Input:** Refine existing agent md to skill  
-**Output:** Parse, extract to structured refs, command, install
+- Every command referenced in `SKILL.md` exists in `bin/`.
+- `agent-skills.json` truthfully describes command exports/runtime/validation.
+- No global ad-hoc install locations in scripts (for example `~/.local/bin`).
+- Compatibility adapters do not become the primary interface.
