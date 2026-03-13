@@ -855,7 +855,7 @@ export function createRootParser(rawArgv: string[] = process.argv.slice(2)): Arg
     mcpPlugin({
       serverInfo: {
         name: "agent-skills",
-        version: "2.0.0",
+        version: "2.1.0",
         description: "Install, find, and use Agent Skills over MCP",
       },
       toolOptions: {

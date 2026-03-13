@@ -1,6 +1,8 @@
-# @alcyone-labs/agent-skills (v2)
+# @alcyone-labs/agent-skills 2.1.0
 
 Manifest-driven lifecycle CLI for Agent Skills.
+
+See [`CHANGELOG.md`](./CHANGELOG.md) for the 2.1.0 release notes and differences from 2.0.0.
 
 ## Canonical install model
 

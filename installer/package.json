@@ -1,6 +1,6 @@
 {
   "name": "@alcyone-labs/agent-skills",
-  "version": "2.0.0",
+  "version": "2.1.0",
   "description": "Manifest-driven Agent Skills lifecycle CLI (.agents canonical install model)",
   "type": "module",
   "main": "./dist/installer.js",
@@ -10,7 +10,8 @@
   "files": [
     "dist/**/*",
     "!dist/**/*.test.*",
-    "README.md"
+    "README.md",
+    "CHANGELOG.md"
   ],
   "scripts": {
     "build": "tsc",

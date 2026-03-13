@@ -8,12 +8,12 @@ A curated collection of Agent Skills plus a publishable lifecycle CLI (`@alcyone
 
 ```bash
 # npm
-npx --yes @alcyone-labs/agent-skills help
+npx --yes @alcyone-labs/agent-skills --help
 
 # pnpm
-pnpm dlx @alcyone-labs/agent-skills help
+pnpm dlx @alcyone-labs/agent-skills --help
 # alias
-pnpx @alcyone-labs/agent-skills help
+pnpx @alcyone-labs/agent-skills --help
 ```
 
 ### Global install
@@ -25,7 +25,7 @@ npm install -g @alcyone-labs/agent-skills
 # pnpm
 pnpm add -g @alcyone-labs/agent-skills
 
-agent-skills help
+agent-skills --help
 ```
 
 ## Canonical install locations
@@ -39,14 +39,18 @@ agent-skills help
 
 ```bash
 agent-skills install <skill> [--local|--global] [--dry-run]
+agent-skills list
+agent-skills find <free-text request> [--limit 1..5]
+agent-skills use <skill> <skill-bin> [args...]
 agent-skills run <skill> <skill-bin> [args...]
-agent-skills validate [--skill <skill>] [--local|--global]
+agent-skills validate [<skill>] [--local|--global]
 agent-skills update <skill> [--local|--global] [--dry-run]
 agent-skills uninstall <skill> [--local|--global] [--dry-run]
 agent-skills prune [--local|--global] [--dry-run]
 agent-skills reset <skill> [--local|--global] [--dry-run]
 agent-skills clean [--local|--global] [--dry-run]
 agent-skills purge <skill> [--local|--global] [--dry-run]
+agent-skills print-mcp-config [--allow-skill <name>] [--deny-skill <name>]
 ```
 
 ## Available skills
