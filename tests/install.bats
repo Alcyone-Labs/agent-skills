@@ -69,7 +69,7 @@ teardown() {
   cd "$TEMP_DIR"
   run bash -c "printf '1\n5\n8\n' | bash '$BATS_TEST_DIRNAME/../install.sh' --self"
   [ "$status" -eq 0 ]
-  [ -d "$HOME/.config/agents/skills" ]
+  [ -d "$HOME/.agents/skills" ]
 }
 
 @test "install.sh interactive: local install toggles agents correctly" {
@@ -83,7 +83,7 @@ teardown() {
   cd "$TEMP_DIR"
   run bash -c "printf '1\n7\n8\n' | bash '$BATS_TEST_DIRNAME/../install.sh' --self"
   [ "$status" -eq 0 ]
-  [ -d "$HOME/.config/agents/skills" ]
+  [ -d "$HOME/.agents/skills" ]
   [ -d "$HOME/.config/opencode/skills" ]
 }
 

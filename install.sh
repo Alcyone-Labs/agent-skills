@@ -566,7 +566,7 @@ main() {
         "Gemini CLI") s_base="$HOME/.gemini/skills"; c_base="$HOME/.gemini/commands" ;;
         "Claude") s_base="$HOME/.claude/skills" ;;
         "FactoryAI Droid") s_base="$HOME/.factory/skills"; c_base="$HOME/.factory/commands" ;;
-        "Agents") s_base="$HOME/.config/agents/skills" ;;
+        "Agents") s_base="$HOME/.agents/skills" ;;
         "Antigravity") s_base="$HOME/.antigravity/skills" ;;
       esac
     else
