@@ -4,6 +4,23 @@ Manifest-driven lifecycle CLI for Agent Skills.
 
 See [`CHANGELOG.md`](./CHANGELOG.md) for the 2.1.0 release notes and differences from 2.0.0.
 
+## What's new in 2.1.0 vs 2.0.0
+
+2.1.0 expands the installer from install-only lifecycle management into a source-skill discovery and MCP-friendly workflow layer.
+
+Highlights:
+- `list` and `find` for source-skill discovery
+- `use` for ephemeral source-skill execution without persistent `.agents` install state
+- MCP tools for `find`, `use`, and `install`
+- `print-mcp-config` for JSON-only MCP config generation
+- repeated `--allow-skill` / `--deny-skill` policy flags for MCP restriction
+- packaged generated source-skill catalog for metadata-only commands
+- BM25-ranked search over shipped skill metadata
+- command-specific auto-help via ArgParser
+- logger-safe CLI output paths instead of direct `console.*` writes in the installer entrypoint
+- improved CLI catalog rendering for `list` / `find` using colored output when the terminal supports it
+
+
 ## Canonical install model
 
 - Global skills: `~/.agents/skills/<skill>`
@@ -169,6 +186,17 @@ Example output:
   }
 }
 ```
+
+## Development notes
+
+`npm run build` regenerates `src/core/source-skill-index.generated.ts` before compiling TypeScript.
+`npm run typecheck` also regenerates the source-skill index first, so stale packaged metadata does not drift from the repo skill set.
+
+Relevant scripts:
+- `npm run generate:source-skill-index` — regenerate the packaged source catalog only
+- `npm run build` — regenerate the source catalog, then run `tsc`
+- `npm run typecheck` — regenerate the source catalog, then run `tsc --noEmit`
+
 
 ## Publish checklist
 
