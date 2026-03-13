@@ -1,0 +1,13 @@
+{
+  "schemaVersion": 1,
+  "exportedCommands": ["jazz-loading-subscriptions"],
+  "runtime": {
+    "strategy": "none"
+  },
+  "validate": {
+    "requiredPaths": ["bin/jazz-loading-subscriptions"]
+  },
+  "purge": {
+    "externalPaths": []
+  }
+}

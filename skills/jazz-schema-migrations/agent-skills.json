@@ -1,0 +1,13 @@
+{
+  "schemaVersion": 1,
+  "exportedCommands": ["jazz-schema-migrations"],
+  "runtime": {
+    "strategy": "none"
+  },
+  "validate": {
+    "requiredPaths": ["bin/jazz-schema-migrations"]
+  },
+  "purge": {
+    "externalPaths": []
+  }
+}

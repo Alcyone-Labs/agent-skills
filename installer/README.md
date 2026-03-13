@@ -1,17 +1,49 @@
-# @alcyone-labs/agent-skills
+# @alcyone-labs/agent-skills (v2)
 
-`agent-skills` is the lifecycle CLI for Agent Skills packaging and installs.
+Manifest-driven lifecycle CLI for Agent Skills.
 
-## Canonical install locations
+## Canonical install model
 
 - Global skills: `~/.agents/skills/<skill>`
 - Global bins: `~/.agents/bin/<command>`
 - Local skills: `./.agents/skills/<skill>`
 - Local bins: `./.agents/bin/<command>`
 
-Compatibility exports (for clients that do not read `.agents/skills`) are derived from the canonical install.
+Compatibility exports are derived from canonical `.agents` installs (Claude enabled by default).
 
-## Commands
+## Use without installing
+
+### npm / npx
+
+```bash
+npx --yes @alcyone-labs/agent-skills help
+npx --yes @alcyone-labs/agent-skills install exa-search --local --dry-run
+```
+
+### pnpm / pnpx
+
+```bash
+pnpm dlx @alcyone-labs/agent-skills help
+pnpx @alcyone-labs/agent-skills install lightpanda --local --dry-run
+```
+
+## Install globally
+
+### npm
+
+```bash
+npm install -g @alcyone-labs/agent-skills
+agent-skills help
+```
+
+### pnpm
+
+```bash
+pnpm add -g @alcyone-labs/agent-skills
+agent-skills help
+```
+
+## Command surface
 
 ```bash
 agent-skills install <skill> [--local|--global] [--dry-run]
@@ -25,21 +57,16 @@ agent-skills clean [--local|--global] [--dry-run]
 agent-skills purge <skill> [--local|--global] [--dry-run]
 ```
 
-All mutating commands support `--dry-run`.
+All mutating commands honor `--dry-run`.
 
-## Command behavior summary
+## Publish checklist
 
-- `install`: copy/sync skill into canonical `.agents` paths, export bin symlinks, provision runtime.
-- `run`: execute a skill-exported command.
-- `validate`: read-only checks for links, required files, runtime readiness, and config warnings.
-- `update`: refresh from source and re-run provisioning.
-- `uninstall`: remove installed skill, exported bins, and compatibility exports.
-- `prune`: remove dangling symlinks/compat exports.
-- `reset`: rebuild symlinks/runtime from installed manifest.
-- `clean`: remove stale tool-owned residue and dead links.
-- `purge`: uninstall plus explicitly declared external cleanup.
+1. `npm test`
+2. `npm pack --dry-run`
+3. `npm publish --access public` (or with dist-tag as needed)
 
-## Client compatibility
-
-- Gemini CLI supports `.agents/skills` aliases, so separate export is not required by default.
-- Claude Code compatibility export is enabled by default.
+Reference docs:
+- npm publish: https://docs.npmjs.com/cli/v10/commands/npm-publish
+- npm exec/npx semantics: https://docs.npmjs.com/cli/v10/commands/npm-exec
+- pnpm dlx (`pnpx` alias): https://pnpm.io/cli/dlx
+- pnpm global add: https://pnpm.io/cli/add

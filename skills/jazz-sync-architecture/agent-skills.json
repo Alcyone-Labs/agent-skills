@@ -1,0 +1,13 @@
+{
+  "schemaVersion": 1,
+  "exportedCommands": ["jazz-sync-architecture"],
+  "runtime": {
+    "strategy": "none"
+  },
+  "validate": {
+    "requiredPaths": ["bin/jazz-sync-architecture"]
+  },
+  "purge": {
+    "externalPaths": []
+  }
+}

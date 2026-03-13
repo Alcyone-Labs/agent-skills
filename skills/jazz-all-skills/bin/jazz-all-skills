@@ -1,0 +1,16 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+SKILL_DIR="$(cd "${SCRIPT_DIR}/.." && pwd)"
+
+cat <<EOF
+jazz-all-skills is a routing skill.
+
+Read:
+- ${SKILL_DIR}/SKILL.md
+- ${SKILL_DIR}/README.md
+- ${SKILL_DIR}/references/all-skills/
+
+Use this command as a docs entrypoint; route execution to focused Jazz skills.
+EOF

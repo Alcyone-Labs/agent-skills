@@ -1,0 +1,13 @@
+{
+  "schemaVersion": 1,
+  "exportedCommands": ["jazz-all-skills"],
+  "runtime": {
+    "strategy": "none"
+  },
+  "validate": {
+    "requiredPaths": ["bin/jazz-all-skills"]
+  },
+  "purge": {
+    "externalPaths": []
+  }
+}

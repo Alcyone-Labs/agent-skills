@@ -1,0 +1,13 @@
+{
+  "schemaVersion": 1,
+  "exportedCommands": ["sauve-jazz-extension"],
+  "runtime": {
+    "strategy": "none"
+  },
+  "validate": {
+    "requiredPaths": ["bin/sauve-jazz-extension"]
+  },
+  "purge": {
+    "externalPaths": []
+  }
+}

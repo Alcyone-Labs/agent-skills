@@ -1,0 +1,13 @@
+{
+  "schemaVersion": 1,
+  "exportedCommands": ["jazz-runtime-wasm-compat"],
+  "runtime": {
+    "strategy": "none"
+  },
+  "validate": {
+    "requiredPaths": ["bin/jazz-runtime-wasm-compat"]
+  },
+  "purge": {
+    "externalPaths": []
+  }
+}

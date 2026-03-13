@@ -6,7 +6,7 @@ If $ARGUMENTS contains `--update-skill`:
 
 - Check for local install at `.opencode/skills/sauve-jazz-extension/`
 - Check for global install at `~/.config/opencode/skills/sauve-jazz-extension/`
-- If neither exists, run: curl -fsSL https://raw.githubusercontent.com/Alcyone-Labs/skill-forge/main/install.sh | bash -s -- sauve-jazz-extension
+- If neither exists, run: ./skills/sauve-jazz-extension/install.sh --local
 - Stop
 
 skill({ name: 'sauve-jazz-extension' })
