@@ -17,7 +17,7 @@
     "dev": "bun run ./src/installer.ts",
     "start": "node ./dist/installer.js",
     "typecheck": "tsc --noEmit",
-    "test": "npm run build && node --test dist/core/lifecycle.test.js",
+    "test": "npm run build && node --test dist/core/catalog.test.js dist/core/mcp-config.test.js dist/core/lifecycle.test.js dist/installer.test.js",
     "prepare": "pnpm run build",
     "prepublishOnly": "pnpm run build"
   },
@@ -47,10 +47,11 @@
     "access": "public"
   },
   "dependencies": {
-    "@alcyone-labs/arg-parser": "^2.14.2"
+    "@alcyone-labs/arg-parser": "^3.0.0",
+    "@alcyone-labs/arg-parser-mcp": "^3.0.0"
   },
   "devDependencies": {
-    "@types/node": "^22.19.8",
+    "@types/node": "^25.5.0",
     "typescript": "^5.9.3"
   },
   "engines": {

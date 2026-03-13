@@ -62,9 +62,26 @@ export interface SkillInfo {
     name: string;
     path: string;
     source: SkillSource;
+    description: string | null;
     hasCommands: boolean;
     manifestPath: string | null;
     manifest: SkillManifest;
+}
+export interface SkillCatalogEntry {
+    name: string;
+    description: string | null;
+    exportedCommands: string[];
+    path: string;
+    source: SkillSource;
+}
+export interface SkillAccessPolicy {
+    allowSkills?: string[];
+    denySkills?: string[];
+}
+export interface SkillSearchResult {
+    skill: SkillCatalogEntry;
+    score: number;
+    reasons: string[];
 }
 export interface InstallationLayout {
     scope: InstallScope;
@@ -77,6 +94,19 @@ export interface MutationOptions {
     dryRun: boolean;
     installCommandAdapters: boolean;
     compatibilityClients: CompatibilityClient[];
+}
+export interface SkillCommandExecutionOptions {
+    captureOutput?: boolean;
+    cwd?: string;
+    env?: NodeJS.ProcessEnv;
+}
+export interface SkillCommandExecutionResult {
+    skill: string;
+    command: string;
+    args: string[];
+    exitCode: number;
+    stdout: string;
+    stderr: string;
 }
 export interface ValidationIssue {
     skill: string;

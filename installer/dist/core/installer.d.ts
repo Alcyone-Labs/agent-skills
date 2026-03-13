@@ -1,4 +1,4 @@
-import { type MutationOptions, type OperationResult, type SkillInfo, type ValidationIssue } from "./types.js";
+import { type MutationOptions, type OperationResult, type SkillCommandExecutionOptions, type SkillCommandExecutionResult, type SkillInfo, type ValidationIssue } from "./types.js";
 interface UninstallOptions {
     scope: MutationOptions["scope"];
     dryRun: boolean;
@@ -15,6 +15,8 @@ export declare function validateSkill(skillName: string, scope: MutationOptions[
 export declare function validateAllInstalledSkills(scope: MutationOptions["scope"], cwd?: string): Promise<ValidationIssue[]>;
 export declare function pruneInstall(scope: MutationOptions["scope"], dryRun: boolean, cwd?: string): Promise<string[]>;
 export declare function cleanInstall(scope: MutationOptions["scope"], dryRun: boolean, cwd?: string): Promise<string[]>;
+export declare function executeSkillCommand(skill: SkillInfo, commandName: string, args: string[], options?: SkillCommandExecutionOptions): Promise<SkillCommandExecutionResult>;
+export declare function useSourceSkillCommand(skill: SkillInfo, commandName: string, args: string[], options?: SkillCommandExecutionOptions): Promise<SkillCommandExecutionResult>;
 export declare function runSkillCommand(skill: SkillInfo, commandName: string, args: string[]): Promise<number>;
 export {};
 //# sourceMappingURL=installer.d.ts.map

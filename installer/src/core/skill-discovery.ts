@@ -1,8 +1,10 @@
-import { access, readdir, stat } from "fs/promises";
+import { access, readdir, readFile, stat } from "fs/promises";
 import { join, resolve } from "path";
 import { loadSkillManifest } from "./manifest.js";
 import { resolveInstallationLayout } from "./paths.js";
 import type { InstallScope, SkillInfo, SkillSource } from "./types.js";
+
+const SKILL_MARKDOWN_FILES = ["SKILL.md", "Skill.md"] as const;
 
 async function directoryExists(path: string): Promise<boolean> {
   try {
@@ -13,13 +15,62 @@ async function directoryExists(path: string): Promise<boolean> {
   }
 }
 
-async function isSkillDirectory(path: string): Promise<boolean> {
-  const hasSkillMd = await directoryExists(join(path, "SKILL.md"));
-  if (hasSkillMd) {
-    return true;
+async function resolveSkillMarkdownPath(path: string): Promise<string | null> {
+  for (const fileName of SKILL_MARKDOWN_FILES) {
+    const candidatePath = join(path, fileName);
+    if (await directoryExists(candidatePath)) {
+      return candidatePath;
+    }
   }
 
-  return directoryExists(join(path, "Skill.md"));
+  return null;
+}
+
+function stripWrappingQuotes(value: string): string {
+  if (
+    (value.startsWith('"') && value.endsWith('"')) ||
+    (value.startsWith("'") && value.endsWith("'"))
+  ) {
+    return value.slice(1, -1);
+  }
+
+  return value;
+}
+
+function parseFrontmatterDescription(markdown: string): string | null {
+  const frontmatterMatch = markdown.match(/^---\r?\n([\s\S]*?)\r?\n---(?:\r?\n|$)/);
+  if (!frontmatterMatch) {
+    return null;
+  }
+
+  const descriptionLine = frontmatterMatch[1]
+    .split(/\r?\n/)
+    .find((line) => line.trimStart().startsWith("description:"));
+
+  if (!descriptionLine) {
+    return null;
+  }
+
+  const rawDescription = descriptionLine.slice(descriptionLine.indexOf(":") + 1).trim();
+  if (rawDescription.length === 0) {
+    return null;
+  }
+
+  return stripWrappingQuotes(rawDescription);
+}
+
+async function readSkillDescription(skillPath: string): Promise<string | null> {
+  const markdownPath = await resolveSkillMarkdownPath(skillPath);
+  if (!markdownPath) {
+    return null;
+  }
+
+  const markdown = await readFile(markdownPath, "utf-8");
+  return parseFrontmatterDescription(markdown);
+}
+
+async function isSkillDirectory(path: string): Promise<boolean> {
+  return (await resolveSkillMarkdownPath(path)) !== null;
 }
 
 export async function discoverSkillsInDirectory(
@@ -46,12 +97,14 @@ export async function discoverSkillsInDirectory(
     }
 
     const hasCommands = await directoryExists(join(skillPath, "commands"));
+    const description = await readSkillDescription(skillPath);
     const { manifestPath, manifest } = await loadSkillManifest(skillPath);
 
     skills.push({
       name: entry,
       path: skillPath,
       source,
+      description,
       hasCommands,
       manifestPath,
       manifest,

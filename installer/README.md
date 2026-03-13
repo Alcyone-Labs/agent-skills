@@ -11,19 +11,20 @@ Manifest-driven lifecycle CLI for Agent Skills.
 
 Compatibility exports are derived from canonical `.agents` installs (Claude enabled by default).
 
-## Use without installing
+## Use without installing the package
 
 ### npm / npx
 
 ```bash
-npx --yes @alcyone-labs/agent-skills help
-npx --yes @alcyone-labs/agent-skills install exa-search --local --dry-run
+npx --yes @alcyone-labs/agent-skills --help
+npx --yes @alcyone-labs/agent-skills list
+npx --yes @alcyone-labs/agent-skills find "browser markdown extraction"
 ```
 
 ### pnpm / pnpx
 
 ```bash
-pnpm dlx @alcyone-labs/agent-skills help
+pnpm dlx @alcyone-labs/agent-skills --help
 pnpx @alcyone-labs/agent-skills install lightpanda --local --dry-run
 ```
 
@@ -33,31 +34,136 @@ pnpx @alcyone-labs/agent-skills install lightpanda --local --dry-run
 
 ```bash
 npm install -g @alcyone-labs/agent-skills
-agent-skills help
+agent-skills --help
 ```
 
 ### pnpm
 
 ```bash
 pnpm add -g @alcyone-labs/agent-skills
-agent-skills help
+agent-skills --help
 ```
 
 ## Command surface
 
+Use `agent-skills --help` for top-level help and `agent-skills <command> --help` for command-specific help.
+
 ```bash
 agent-skills install <skill> [--local|--global] [--dry-run]
+agent-skills list
+agent-skills find <free-text request> [--limit 1..5]
+agent-skills use <skill> <skill-bin> [args...]
 agent-skills run <skill> <skill-bin> [args...]
-agent-skills validate [--skill <skill>] [--local|--global]
+agent-skills validate [<skill>] [--local|--global]
 agent-skills update <skill> [--local|--global] [--dry-run]
 agent-skills uninstall <skill> [--local|--global] [--dry-run]
 agent-skills prune [--local|--global] [--dry-run]
 agent-skills reset <skill> [--local|--global] [--dry-run]
 agent-skills clean [--local|--global] [--dry-run]
 agent-skills purge <skill> [--local|--global] [--dry-run]
+agent-skills print-mcp-config [--allow-skill <name>] [--deny-skill <name>]
 ```
 
 All mutating commands honor `--dry-run`.
+
+## Discover source skills
+
+List every source skill with its description:
+
+```bash
+agent-skills list
+```
+
+Find the most relevant 1-5 skills for a request:
+
+```bash
+agent-skills find "chrome extension mv3 service worker auth"
+agent-skills find "browser markdown extraction" --limit 3
+```
+
+## Run a skill without installing it
+
+`use` stages the source skill in a temporary directory, provisions its runtime if needed, runs the requested command, and removes the temporary copy afterwards.
+
+```bash
+agent-skills use lightpanda lightpanda-fetch https://example.com
+```
+
+`run` keeps its existing meaning: execute a runnable command from source or installed skill precedence.
+
+```bash
+agent-skills run lightpanda lightpanda-fetch https://example.com
+```
+
+## MCP support
+
+The CLI exposes these MCP tools:
+
+- `find`
+- `use`
+- `install`
+
+Start the MCP server directly:
+
+```bash
+npx --yes @alcyone-labs/agent-skills --s-mcp-serve
+```
+
+Restrict the server to an allow-list and/or deny-list of skills:
+
+```bash
+npx --yes @alcyone-labs/agent-skills --s-mcp-serve \
+  --allow-skill lightpanda \
+  --allow-skill skill-forge \
+  --deny-skill exa-search
+```
+
+Policy rules:
+
+- default: all skills are allowed
+- deny-list wins over allow-list
+- `find` only returns allowed skills
+- `install` and `use` reject denied or out-of-scope skills
+
+## Generate MCP config JSON
+
+`print-mcp-config` writes pure JSON to stdout with no headings or extra log output.
+
+Default config:
+
+```bash
+agent-skills print-mcp-config
+```
+
+Restricted config:
+
+```bash
+agent-skills print-mcp-config \
+  --allow-skill lightpanda \
+  --allow-skill skill-forge \
+  --deny-skill exa-search
+```
+
+Example output:
+
+```json
+{
+  "mcpServers": {
+    "agent-skills": {
+      "command": "npx",
+      "args": [
+        "--yes",
+        "@alcyone-labs/agent-skills",
+        "--s-mcp-serve",
+        "--allow-skill",
+        "lightpanda",
+        "--deny-skill",
+        "exa-search"
+      ]
+    }
+  }
+}
+```
 
 ## Publish checklist
 

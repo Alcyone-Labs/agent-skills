@@ -1,6 +1,12 @@
 # Build Patterns
 
-## When Split references/
+## Choose the Smallest Truthful Shape
+
+- Docs-only: `SKILL.md` plus focused `references/` when the skill is guidance-first.
+- Command-bearing: add `bin/` when the skill exports user-facing commands.
+- Runtime/binary-bearing: add `scripts/`, `runtime/`, and manifest runtime metadata only when provisioning is real.
+
+## When Split `references/`
 
 - Nuanced APIs/config/lifecycle/gotchas
 - > 1 subsystem/product
@@ -18,9 +24,9 @@
 
 A. Clarify: name/repo/platforms/topics
 B. Research: APIs/config/issues verbatim
-C. Design: desc YAML tree references layout
-D. Write 5 files/topic
-E. Assemble SKILL.md command install; validate
+C. Design: pick package shape, manifest needs, references layout
+D. Write the smallest set of files that keeps the skill truthful
+E. Assemble `SKILL.md`, optional `README.md`, optional adapters; validate install/runtime claims
 
 ## Best Practices
 
@@ -29,3 +35,6 @@ E. Assemble SKILL.md command install; validate
 - Privacy: no secrets/keys hardcoded
 - Examples: 2-3 concrete file-based clusters
 - kebab-case; SKILL.md CAPITALIZED
+- Treat `agent-skills` and `.agents/...` as the canonical install story.
+- Treat `commands/` and `install.sh` as optional compatibility layers, never the core architecture.
+- If the skill provisions binaries or dependencies, document where they live and how install/update/reset rebuilds them.

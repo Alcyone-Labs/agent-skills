@@ -1,9 +1,16 @@
-import { access, cp, lstat, mkdir, readFile, readdir, readlink, rm, stat, symlink, writeFile, } from "fs/promises";
+import { access, cp, lstat, mkdir, mkdtemp, readFile, readdir, readlink, rm, stat, symlink, writeFile, } from "fs/promises";
 import { spawn } from "child_process";
+import { tmpdir } from "os";
 import { dirname, join, resolve } from "path";
 import { AVAILABLE_CLIENTS, CLIENT_CONFIGS, DEFAULT_COMPATIBILITY_CLIENTS, } from "./types.js";
 import { resolveClientSkillDirectory, resolveCommandAdapterDirectory, resolveInstallationLayout, } from "./paths.js";
 import { loadSkillManifest } from "./manifest.js";
+const EPHEMERAL_MUTATION_OPTIONS = {
+    scope: "local",
+    dryRun: false,
+    installCommandAdapters: false,
+    compatibilityClients: [],
+};
 function unique(values) {
     return Array.from(new Set(values));
 }
@@ -28,28 +35,45 @@ async function ensureDir(path, dryRun) {
     }
     await mkdir(path, { recursive: true });
 }
-async function runCommand(command, cwd, dryRun) {
-    if (command.length === 0) {
-        return;
-    }
-    if (dryRun) {
-        return;
-    }
-    await new Promise((resolvePromise, rejectPromise) => {
-        const child = spawn(command[0], command.slice(1), {
-            cwd,
-            stdio: "inherit",
-            env: process.env,
+async function executeProcess(command, args, options = {}) {
+    const stdoutChunks = [];
+    const stderrChunks = [];
+    const captureOutput = Boolean(options.captureOutput);
+    return new Promise((resolvePromise, rejectPromise) => {
+        const child = spawn(command, args, {
+            cwd: options.cwd ?? process.cwd(),
+            stdio: captureOutput ? ["ignore", "pipe", "pipe"] : "inherit",
+            env: options.env ?? process.env,
         });
+        if (captureOutput) {
+            child.stdout?.on("data", (chunk) => {
+                stdoutChunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
+            });
+            child.stderr?.on("data", (chunk) => {
+                stderrChunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
+            });
+        }
         child.once("error", rejectPromise);
-        child.once("exit", (code) => {
-            if (code === 0) {
-                resolvePromise();
-                return;
-            }
-            rejectPromise(new Error(`Command failed (${command.join(" ")}) with exit code ${code ?? "unknown"}`));
+        child.once("close", (code) => {
+            resolvePromise({
+                exitCode: code ?? 1,
+                stdout: Buffer.concat(stdoutChunks).toString("utf-8"),
+                stderr: Buffer.concat(stderrChunks).toString("utf-8"),
+            });
         });
     });
+}
+async function runCommand(command, cwd, dryRun) {
+    if (command.length === 0 || dryRun) {
+        return;
+    }
+    const result = await executeProcess(command[0], command.slice(1), {
+        cwd,
+        env: process.env,
+    });
+    if (result.exitCode !== 0) {
+        throw new Error(`Command failed (${command.join(" ")}) with exit code ${result.exitCode}`);
+    }
 }
 async function removeIfExists(path, dryRun) {
     if (!(await pathExists(path))) {
@@ -197,6 +221,28 @@ async function provisionRuntime(installedSkillDir, manifest, options, changedPat
     const command = runtime.installCommand ?? ["npm", "install", "--omit=dev"];
     changedPaths.push(installedSkillDir);
     await runCommand(command, installedSkillDir, options.dryRun);
+}
+function assertSuccessfulSkillCommand(result) {
+    if (result.exitCode === 0) {
+        return;
+    }
+    throw new Error(`Skill command '${result.skill}/${result.command}' exited with code ${result.exitCode}`);
+}
+async function stageSkillForExecution(skill) {
+    const tempDir = await mkdtemp(join(tmpdir(), "agent-skills-use-"));
+    const stagedSkillDir = join(tempDir, skill.name);
+    await cp(skill.path, stagedSkillDir, { recursive: true });
+    const { manifestPath, manifest } = await loadSkillManifest(stagedSkillDir);
+    await provisionRuntime(stagedSkillDir, manifest, EPHEMERAL_MUTATION_OPTIONS, []);
+    return {
+        tempDir,
+        stagedSkill: {
+            ...skill,
+            path: stagedSkillDir,
+            manifestPath,
+            manifest,
+        },
+    };
 }
 async function installSkillInternal(skill, options, cwd = process.cwd()) {
     const layout = resolveInstallationLayout(options.scope, cwd);
@@ -442,25 +488,37 @@ export async function cleanInstall(scope, dryRun, cwd = process.cwd()) {
     cleaned.push(...pruned);
     return unique(cleaned);
 }
-export async function runSkillCommand(skill, commandName, args) {
+export async function executeSkillCommand(skill, commandName, args, options = {}) {
     const commandPath = join(skill.path, "bin", commandName);
     if (!(await pathExists(commandPath))) {
         throw new Error(`Skill '${skill.name}' does not export '${commandName}'`);
     }
-    await new Promise((resolvePromise, rejectPromise) => {
-        const child = spawn(commandPath, args, {
-            stdio: "inherit",
-            env: process.env,
-        });
-        child.once("error", rejectPromise);
-        child.once("exit", (code) => {
-            if (code === 0) {
-                resolvePromise();
-                return;
-            }
-            rejectPromise(new Error(`Command exited with code ${code ?? "unknown"}`));
-        });
+    const result = await executeProcess(commandPath, args, {
+        ...options,
+        cwd: options.cwd ?? process.cwd(),
+        env: options.env ?? process.env,
     });
-    return 0;
+    return {
+        skill: skill.name,
+        command: commandName,
+        args: [...args],
+        exitCode: result.exitCode,
+        stdout: result.stdout,
+        stderr: result.stderr,
+    };
+}
+export async function useSourceSkillCommand(skill, commandName, args, options = {}) {
+    const { tempDir, stagedSkill } = await stageSkillForExecution(skill);
+    try {
+        return await executeSkillCommand(stagedSkill, commandName, args, options);
+    }
+    finally {
+        await rm(tempDir, { recursive: true, force: true });
+    }
+}
+export async function runSkillCommand(skill, commandName, args) {
+    const result = await executeSkillCommand(skill, commandName, args);
+    assertSuccessfulSkillCommand(result);
+    return result.exitCode;
 }
 //# sourceMappingURL=installer.js.map

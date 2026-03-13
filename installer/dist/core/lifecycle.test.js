@@ -1,36 +1,12 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { access, mkdtemp, mkdir, readlink, rm, symlink, writeFile } from "node:fs/promises";
+import { mkdtemp, mkdir, readlink, rm, symlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { loadSkillManifest } from "./manifest.js";
-import { discoverAllSkillsByPrecedence, discoverSkillsInDirectory, findRunnableSkillByName, } from "./skill-discovery.js";
-import { cleanInstall, installSkill, pruneInstall, purgeSkill, resetSkill, uninstallSkill, validateSkill, } from "./installer.js";
-async function createSkill(skillsRoot, skillName, manifestContent) {
-    const skillDir = join(skillsRoot, skillName);
-    const binDir = join(skillDir, "bin");
-    await mkdir(binDir, { recursive: true });
-    await writeFile(join(skillDir, "SKILL.md"), `# ${skillName}\n`, "utf-8");
-    await writeFile(join(binDir, `${skillName}-cmd`), "#!/usr/bin/env bash\nexit 0\n", "utf-8");
-    if (manifestContent) {
-        await writeFile(join(skillDir, "agent-skills.json"), manifestContent, "utf-8");
-    }
-    const discovered = await discoverSkillsInDirectory(skillsRoot, "source");
-    const skill = discovered.find((entry) => entry.name === skillName);
-    if (!skill) {
-        throw new Error(`Failed to create skill ${skillName}`);
-    }
-    return skill;
-}
-async function pathExists(path) {
-    try {
-        await access(path);
-        return true;
-    }
-    catch {
-        return false;
-    }
-}
+import { discoverAllSkillsByPrecedence, findRunnableSkillByName, } from "./skill-discovery.js";
+import { cleanInstall, installSkill, pruneInstall, purgeSkill, resetSkill, uninstallSkill, useSourceSkillCommand, validateSkill, } from "./installer.js";
+import { createSkill, pathExists } from "./test-helpers.test.js";
 test("manifest parsing supports explicit and inferred commands", async () => {
     const workspace = await mkdtemp(join(tmpdir(), "agent-skills-manifest-"));
     try {
@@ -78,7 +54,7 @@ test("discovery precedence and runnable fallback prefer viable install", async (
                 requiredPaths: ["runtime/browser/lightpanda"],
             },
         }, null, 2);
-        await createSkill(sourceSkillsDir, "demo", sourceManifest);
+        await createSkill(sourceSkillsDir, "demo", { manifestContent: sourceManifest });
         const localManifest = JSON.stringify({
             schemaVersion: 1,
             exportedCommands: ["demo-cmd"],
@@ -86,8 +62,8 @@ test("discovery precedence and runnable fallback prefer viable install", async (
                 strategy: "none",
             },
         }, null, 2);
-        const localSkill = await createSkill(localSkillsDir, "demo", localManifest);
-        const globalSkill = await createSkill(globalSkillsDir, "demo", localManifest);
+        const localSkill = await createSkill(localSkillsDir, "demo", { manifestContent: localManifest });
+        const globalSkill = await createSkill(globalSkillsDir, "demo", { manifestContent: localManifest });
         assert.ok(localSkill && globalSkill);
         const ordered = await discoverAllSkillsByPrecedence(workspace);
         assert.equal(ordered[0]?.source, "source");
@@ -120,7 +96,7 @@ test("lifecycle operations manage bins, compatibility links, prune, clean, purge
                 externalPaths: [externalFile],
             },
         }, null, 2);
-        const sourceSkill = await createSkill(sourceSkillsDir, "demo", manifest);
+        const sourceSkill = await createSkill(sourceSkillsDir, "demo", { manifestContent: manifest });
         const localOptions = {
             scope: "local",
             dryRun: false,
@@ -171,6 +147,42 @@ test("lifecycle operations manage bins, compatibility links, prune, clean, purge
     }
     finally {
         process.env.HOME = originalHome;
+        await rm(workspace, { recursive: true, force: true });
+    }
+});
+test("ephemeral use executes source skill without persistent install state", async () => {
+    const workspace = await mkdtemp(join(tmpdir(), "agent-skills-use-"));
+    try {
+        const sourceSkillsDir = join(workspace, "skills");
+        await mkdir(sourceSkillsDir, { recursive: true });
+        const manifest = JSON.stringify({
+            schemaVersion: 1,
+            exportedCommands: ["demo-cmd"],
+            runtime: {
+                strategy: "none",
+            },
+        }, null, 2);
+        const sourceSkill = await createSkill(sourceSkillsDir, "demo", {
+            manifestContent: manifest,
+            commandNames: ["demo-cmd"],
+            commandContents: {
+                "demo-cmd": [
+                    "#!/usr/bin/env bash",
+                    "printf 'argv:%s\\n' \"$*\"",
+                ].join("\n"),
+            },
+        });
+        const result = await useSourceSkillCommand(sourceSkill, "demo-cmd", ["one", "two"], {
+            captureOutput: true,
+            cwd: workspace,
+        });
+        assert.equal(result.exitCode, 0);
+        assert.equal(result.stderr, "");
+        assert.ok(result.stdout.includes("argv:one two"));
+        assert.equal(await pathExists(join(workspace, ".agents", "skills", "demo")), false);
+        assert.equal(await pathExists(join(workspace, ".agents", "bin", "demo-cmd")), false);
+    }
+    finally {
         await rm(workspace, { recursive: true, force: true });
     }
 });
