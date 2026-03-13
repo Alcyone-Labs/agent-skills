@@ -14,10 +14,11 @@
     "CHANGELOG.md"
   ],
   "scripts": {
-    "build": "tsc",
+    "generate:source-skill-index": "node ./scripts/generate-source-skill-index.mjs",
+    "build": "npm run generate:source-skill-index && tsc",
     "dev": "bun run ./src/installer.ts",
     "start": "node ./dist/installer.js",
-    "typecheck": "tsc --noEmit",
+    "typecheck": "npm run generate:source-skill-index && tsc --noEmit",
     "test": "npm run build && node --test dist/core/catalog.test.js dist/core/mcp-config.test.js dist/core/lifecycle.test.js dist/installer.test.js",
     "prepare": "pnpm run build",
     "prepublishOnly": "pnpm run build"

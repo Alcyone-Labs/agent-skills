@@ -70,18 +70,21 @@ All mutating commands honor `--dry-run`.
 
 ## Discover source skills
 
-List every source skill with its description:
+List every source skill with its description from the packaged source catalog index (no GitHub clone or local source checkout required):
 
 ```bash
 agent-skills list
 ```
 
-Find the most relevant 1-5 skills for a request:
+Find the most relevant 1-5 skills for a request using BM25 over the shipped skill catalog metadata:
 
 ```bash
 agent-skills find "chrome extension mv3 service worker auth"
 agent-skills find "browser markdown extraction" --limit 3
+agent-skills find "jazz service worker" --limit 5
 ```
+
+`list` and `find` are metadata-only commands. `install` and `use` still resolve real source skill contents on demand from the local repo or remote source when needed.
 
 ## Run a skill without installing it
 

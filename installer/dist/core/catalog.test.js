@@ -5,7 +5,18 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { assertSkillAllowed, clampCatalogSearchLimit, listCatalogSkills, searchCatalogSkills, } from "./catalog.js";
 import { discoverSkillsInDirectory } from "./skill-discovery.js";
+import { SOURCE_SKILL_INDEX } from "./source-skill-index.generated.js";
 import { createSkill } from "./test-helpers.test.js";
+function createIndexedSkill(skill) {
+    return {
+        name: skill.name,
+        description: skill.description ?? null,
+        exportedCommands: skill.exportedCommands ?? [],
+        path: skill.path ?? `skills/${skill.name}`,
+        source: "source",
+        searchText: skill.searchText ?? skill.description ?? skill.name,
+    };
+}
 test("discovery reads description from SKILL frontmatter", async () => {
     const workspace = await mkdtemp(join(tmpdir(), "agent-skills-catalog-desc-"));
     try {
@@ -22,87 +33,51 @@ test("discovery reads description from SKILL frontmatter", async () => {
         await rm(workspace, { recursive: true, force: true });
     }
 });
-test("catalog listing includes descriptions and search is deterministic", async () => {
-    const workspace = await mkdtemp(join(tmpdir(), "agent-skills-catalog-search-"));
-    try {
-        const skillsRoot = join(workspace, "skills");
-        await mkdir(skillsRoot, { recursive: true });
-        await createSkill(skillsRoot, "alpha-search", {
-            description: "Search web pages and code snippets for research.",
-            commandNames: ["alpha-search", "alpha-code"],
-        });
-        await createSkill(skillsRoot, "beta-browser", {
-            description: "Browser markdown fetch and semantic tree extraction.",
-            commandNames: ["beta-fetch", "beta-semantic"],
-        });
-        await createSkill(skillsRoot, "gamma-index", {
-            description: "Search documentation indexes and code catalogs.",
-            commandNames: ["gamma-search"],
-        });
-        const skills = await discoverSkillsInDirectory(skillsRoot, "source");
-        const listed = listCatalogSkills(skills);
-        assert.deepEqual(listed.map((skill) => [skill.name, skill.description]), [
-            ["alpha-search", "Search web pages and code snippets for research."],
-            ["beta-browser", "Browser markdown fetch and semantic tree extraction."],
-            ["gamma-index", "Search documentation indexes and code catalogs."],
-        ]);
-        const results = searchCatalogSkills(skills, "search code", { limit: 5 });
-        assert.deepEqual(results.map((result) => result.skill.name), ["alpha-search", "gamma-index"]);
-        assert.ok(results[0]?.score > results[1]?.score);
-        assert.match(results[0]?.reasons.join(" ") ?? "", /matched commands|matched description terms|matched name terms/);
-    }
-    finally {
-        await rm(workspace, { recursive: true, force: true });
-    }
+test("packaged source index is committed and includes searchable metadata", () => {
+    assert.ok(SOURCE_SKILL_INDEX.length > 0);
+    const argParser = SOURCE_SKILL_INDEX.find((skill) => skill.name === "arg-parser");
+    assert.ok(argParser);
+    assert.equal(argParser.path, "skills/arg-parser");
+    assert.match(argParser.searchText, /mandatory|MCP|interactive/i);
 });
-test("catalog search limit clamps to one through five", async () => {
-    const workspace = await mkdtemp(join(tmpdir(), "agent-skills-catalog-limit-"));
-    try {
-        const skillsRoot = join(workspace, "skills");
-        await mkdir(skillsRoot, { recursive: true });
-        for (const name of ["alpha", "bravo", "charlie", "delta", "echo", "foxtrot"]) {
-            await createSkill(skillsRoot, name, {
-                description: "Shared demo catalog entry.",
-                commandNames: [`${name}-demo`],
-            });
-        }
-        const skills = await discoverSkillsInDirectory(skillsRoot, "source");
-        assert.equal(clampCatalogSearchLimit(undefined), 5);
-        assert.equal(clampCatalogSearchLimit(0), 1);
-        assert.equal(clampCatalogSearchLimit(99), 5);
-        assert.equal(searchCatalogSkills(skills, "demo", { limit: 99 }).length, 5);
-        assert.equal(searchCatalogSkills(skills, "demo", { limit: 0 }).length, 1);
-    }
-    finally {
-        await rm(workspace, { recursive: true, force: true });
-    }
+test("BM25 search returns relevant packaged skills for jazz service worker", () => {
+    const results = searchCatalogSkills(SOURCE_SKILL_INDEX, "jazz service worker", { limit: 5 });
+    const names = results.map((result) => result.skill.name);
+    assert.ok(results.length > 0);
+    assert.ok(names.includes("sauve-jazz-extension"));
+    assert.ok(names.includes("jazz-runtime-wasm-compat"));
+    assert.match(results[0]?.reasons.join(" ") ?? "", /matched .*terms|matched commands/);
 });
-test("catalog allow and deny policy filters results with deny precedence", async () => {
-    const workspace = await mkdtemp(join(tmpdir(), "agent-skills-catalog-policy-"));
-    try {
-        const skillsRoot = join(workspace, "skills");
-        await mkdir(skillsRoot, { recursive: true });
-        await createSkill(skillsRoot, "allowed", {
-            description: "Allowed search skill.",
-            commandNames: ["allowed-search"],
-        });
-        await createSkill(skillsRoot, "blocked", {
-            description: "Blocked search skill.",
-            commandNames: ["blocked-search"],
-        });
-        const skills = await discoverSkillsInDirectory(skillsRoot, "source");
-        const policy = {
-            allowSkills: ["allowed", "blocked"],
-            denySkills: ["blocked"],
-        };
-        assert.deepEqual(listCatalogSkills(skills, policy).map((skill) => skill.name), ["allowed"]);
-        assert.deepEqual(searchCatalogSkills(skills, "search", { policy }).map((result) => result.skill.name), ["allowed"]);
-        assert.doesNotThrow(() => assertSkillAllowed("allowed", "install", policy));
-        assert.throws(() => assertSkillAllowed("blocked", "use", policy), /denied for MCP use/);
-        assert.throws(() => assertSkillAllowed("missing", "install", { allowSkills: ["allowed"] }), /not allowed for MCP install/);
-    }
-    finally {
-        await rm(workspace, { recursive: true, force: true });
-    }
+test("catalog search limit clamps to one through five", () => {
+    assert.equal(clampCatalogSearchLimit(undefined), 5);
+    assert.equal(clampCatalogSearchLimit(0), 1);
+    assert.equal(clampCatalogSearchLimit(99), 5);
+    assert.equal(searchCatalogSkills(SOURCE_SKILL_INDEX, "jazz", { limit: 99 }).length, 5);
+    assert.equal(searchCatalogSkills(SOURCE_SKILL_INDEX, "jazz", { limit: 0 }).length, 1);
+});
+test("catalog allow and deny policy filters results with deny precedence", () => {
+    const skills = [
+        createIndexedSkill({
+            name: "allowed-worker",
+            description: "Allowed service worker skill.",
+            exportedCommands: ["allowed-worker"],
+            searchText: "allowed service worker guide",
+        }),
+        createIndexedSkill({
+            name: "blocked-worker",
+            description: "Blocked service worker skill.",
+            exportedCommands: ["blocked-worker"],
+            searchText: "blocked service worker guide",
+        }),
+    ];
+    const policy = {
+        allowSkills: ["allowed-worker", "blocked-worker"],
+        denySkills: ["blocked-worker"],
+    };
+    assert.deepEqual(listCatalogSkills(skills, policy).map((skill) => skill.name), ["allowed-worker"]);
+    assert.deepEqual(searchCatalogSkills(skills, "service worker", { policy }).map((result) => result.skill.name), ["allowed-worker"]);
+    assert.doesNotThrow(() => assertSkillAllowed("allowed-worker", "install", policy));
+    assert.throws(() => assertSkillAllowed("blocked-worker", "use", policy), /denied for MCP use/);
+    assert.throws(() => assertSkillAllowed("missing", "install", { allowSkills: ["allowed-worker"] }), /not allowed for MCP install/);
 });
 //# sourceMappingURL=catalog.test.js.map

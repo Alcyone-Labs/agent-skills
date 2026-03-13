@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-import { ArgParser } from "@alcyone-labs/arg-parser";
+import { ArgParser, SimpleChalk, } from "@alcyone-labs/arg-parser";
 import { mcpPlugin } from "@alcyone-labs/arg-parser-mcp";
 import { execSync } from "child_process";
 import { mkdtempSync, rmSync } from "fs";
@@ -7,7 +7,8 @@ import { tmpdir } from "os";
 import { join } from "path";
 import { pathToFileURL } from "url";
 import { assertSkillAllowed, listCatalogSkills, searchCatalogSkills, } from "./core/catalog.js";
-import { buildMcpConfigSnippet, extractSkillAccessPolicy } from "./core/mcp-config.js";
+import { buildMcpConfigSnippet, extractSkillAccessPolicy, } from "./core/mcp-config.js";
+import { SOURCE_SKILL_INDEX } from "./core/source-skill-index.generated.js";
 import { cleanInstall, installSkill, purgeSkill, pruneInstall, resetSkill, runSkillCommand, uninstallSkill, updateSkill, useSourceSkillCommand, validateAllInstalledSkills, validateSkill, } from "./core/installer.js";
 import { discoverSkillsInDirectory, discoverSourceSkills, findRunnableSkillByName, } from "./core/skill-discovery.js";
 import { AVAILABLE_CLIENTS, } from "./core/types.js";
@@ -43,7 +44,8 @@ function normalizeCompatibilityClients(values) {
         if (directMatch) {
             return directMatch;
         }
-        if (value.toLowerCase() === "droid" || value.toLowerCase() === "factory") {
+        if (value.toLowerCase() === "droid" ||
+            value.toLowerCase() === "factory") {
             return "FactoryAI Droid";
         }
         throw new Error(`Unsupported compatibility client: ${value}`);
@@ -96,33 +98,50 @@ function wrapText(text, width) {
     }
     return lines;
 }
-function printWrappedBlock(label, text, indent) {
+function formatWrappedBlock(label, text, indent, styledLabel = label) {
     const lines = wrapText(`${label}${text}`, terminalTextWidth() - indent.length);
-    for (const line of lines) {
-        console.log(`${indent}${line}`);
+    if (lines.length === 0) {
+        return [];
     }
+    return lines.map((line, index) => {
+        if (index === 0 && label.length > 0 && line.startsWith(label)) {
+            return `${indent}${styledLabel}${line.slice(label.length)}`;
+        }
+        return `${indent}${line}`;
+    });
 }
-function printCatalogEntry(entry, prefix = "") {
-    console.log(`${prefix}${entry.name}`);
-    printWrappedBlock("", entry.description ?? "(no description)", "  ");
+function formatCatalogEntry(entry, prefix = "") {
+    return [
+        `${prefix}${SimpleChalk.cyan.bold(entry.name)}`,
+        ...formatWrappedBlock("", entry.description ?? "(no description)", "  "),
+    ];
 }
-function printSearchResult(result, index) {
-    printCatalogEntry(result.skill, `${index + 1}. `);
-    printWrappedBlock("Why: ", result.reasons.join("; "), "   ");
+function formatSearchResult(result, index) {
+    const rankPrefix = `${SimpleChalk.yellow.bold(`${index + 1}.`)}` + " ";
+    return [
+        ...formatCatalogEntry(result.skill, rankPrefix),
+        ...formatWrappedBlock("Why: ", result.reasons.join("; "), "   ", SimpleChalk.blue.bold("Why: ")),
+    ];
 }
-function printOperationResult(action, result) {
+function formatOperationResult(action, result) {
     const mode = result.dryRun ? "[dry-run] " : "";
-    console.log(`${mode}${action}: ${result.skill} (${result.scope})`);
+    const lines = [`${mode}${action}: ${result.skill} (${result.scope})`];
     if (result.compatibilityClients && result.compatibilityClients.length > 0) {
-        console.log(`compatibility exports: ${result.compatibilityClients.join(", ")}`);
+        lines.push(`compatibility exports: ${result.compatibilityClients.join(", ")}`);
     }
     if (result.changedPaths.length === 0) {
-        console.log("changes: none");
-        return;
+        lines.push("changes: none");
+        return lines;
     }
-    console.log("changed paths:");
+    lines.push("changed paths:");
     for (const changedPath of result.changedPaths) {
-        console.log(`  - ${changedPath}`);
+        lines.push(`  - ${changedPath}`);
+    }
+    return lines;
+}
+function emitLoggerLines(logger, lines) {
+    for (const line of lines) {
+        logger.log(line);
     }
 }
 function findSourceSkillByName(skills, skillName) {
@@ -274,10 +293,12 @@ function createInstallParser() {
             const args = ctx.args;
             const mutationOptions = createMutationOptions(args);
             await withResolvedSourceSkills(async (skills) => {
-                const selectedSkills = args.all ? skills : [findSourceSkillByName(skills, args.skill)];
+                const selectedSkills = args.all
+                    ? skills
+                    : [findSourceSkillByName(skills, args.skill)];
                 for (const skill of selectedSkills) {
                     const result = await installSkill(skill, mutationOptions);
-                    printOperationResult("install", result);
+                    emitLoggerLines(ctx.logger, formatOperationResult("install", result));
                 }
             });
         },
@@ -298,20 +319,14 @@ function createListParser() {
         appName: "Agent Skills",
         appCommandName: "agent-skills list",
         description: "List source skills with descriptions",
-        handler: async () => {
-            await withResolvedSourceSkills(async (skills) => {
-                const entries = listCatalogSkills(skills);
-                if (entries.length === 0) {
-                    console.log("No source skills found.");
-                    return;
-                }
-                for (const [index, entry] of entries.entries()) {
-                    if (index > 0) {
-                        console.log("");
-                    }
-                    printCatalogEntry(entry);
-                }
-            });
+        handler: async (ctx) => {
+            const entries = listCatalogSkills(SOURCE_SKILL_INDEX);
+            if (entries.length === 0) {
+                emitLoggerLines(ctx.logger, [SimpleChalk.dim("No source skills found.")]);
+                return;
+            }
+            const lines = entries.flatMap((entry, index) => index === 0 ? formatCatalogEntry(entry) : ["", ...formatCatalogEntry(entry)]);
+            emitLoggerLines(ctx.logger, lines);
         },
     });
 }
@@ -323,19 +338,13 @@ function createFindParser() {
         handler: async (ctx) => {
             const args = ctx.args;
             const limit = args.limit ?? DEFAULT_FIND_LIMIT;
-            await withResolvedSourceSkills(async (skills) => {
-                const results = searchCatalogSkills(skills, args.query, { limit });
-                if (results.length === 0) {
-                    console.log("No matching source skills found.");
-                    return;
-                }
-                for (const [index, result] of results.entries()) {
-                    if (index > 0) {
-                        console.log("");
-                    }
-                    printSearchResult(result, index);
-                }
-            });
+            const results = searchCatalogSkills(SOURCE_SKILL_INDEX, args.query, { limit });
+            if (results.length === 0) {
+                emitLoggerLines(ctx.logger, [SimpleChalk.dim("No matching source skills found.")]);
+                return;
+            }
+            const lines = results.flatMap((result, index) => index === 0 ? formatSearchResult(result, index) : ["", ...formatSearchResult(result, index)]);
+            emitLoggerLines(ctx.logger, lines);
         },
     });
     parser.addFlag({
@@ -404,10 +413,12 @@ function createUpdateParser() {
             const args = ctx.args;
             const mutationOptions = createMutationOptions(args);
             await withResolvedSourceSkills(async (skills) => {
-                const selectedSkills = args.all ? skills : [findSourceSkillByName(skills, args.skill)];
+                const selectedSkills = args.all
+                    ? skills
+                    : [findSourceSkillByName(skills, args.skill)];
                 for (const skill of selectedSkills) {
                     const result = await updateSkill(skill, mutationOptions);
-                    printOperationResult("update", result);
+                    emitLoggerLines(ctx.logger, formatOperationResult("update", result));
                 }
             });
         },
@@ -432,7 +443,7 @@ function createResetParser() {
             const args = ctx.args;
             const mutationOptions = createMutationOptions(args);
             const result = await resetSkill(args.skill, mutationOptions);
-            printOperationResult("reset", result);
+            emitLoggerLines(ctx.logger, formatOperationResult("reset", result));
         },
     });
     createCommonMutationFlags(parser);
@@ -450,7 +461,7 @@ function createUninstallParser() {
                 scope: normalizeScope(args),
                 dryRun: Boolean(args.dryRun),
             });
-            printOperationResult("uninstall", result);
+            emitLoggerLines(ctx.logger, formatOperationResult("uninstall", result));
         },
     });
     addScopeFlags(parser);
@@ -469,7 +480,7 @@ function createPurgeParser() {
                 scope: normalizeScope(args),
                 dryRun: Boolean(args.dryRun),
             });
-            printOperationResult("purge", result);
+            emitLoggerLines(ctx.logger, formatOperationResult("purge", result));
         },
     });
     addScopeFlags(parser);
@@ -484,7 +495,9 @@ function createValidateParser() {
         description: "Validate installed skills and exported command links",
         handler: async (ctx) => {
             const args = ctx.args;
-            const scopes = args.local || args.global ? [normalizeScope(args)] : ["local", "global"];
+            const scopes = args.local || args.global
+                ? [normalizeScope(args)]
+                : ["local", "global"];
             const allIssues = [];
             for (const scope of scopes) {
                 if (args.skill) {
@@ -496,12 +509,10 @@ function createValidateParser() {
                 allIssues.push(...issues);
             }
             if (allIssues.length === 0) {
-                console.log("validate: no issues found");
+                emitLoggerLines(ctx.logger, ["validate: no issues found"]);
                 return;
             }
-            for (const issue of allIssues) {
-                console.log(`${issue.severity.toUpperCase()} ${issue.skill}: ${issue.message}`);
-            }
+            emitLoggerLines(ctx.logger, allIssues.map((issue) => `${issue.severity.toUpperCase()} ${issue.skill}: ${issue.message}`));
             if (allIssues.some((issue) => issue.severity === "error")) {
                 process.exitCode = 1;
             }
@@ -518,14 +529,16 @@ function createPruneParser() {
         description: "Remove dangling command links and compatibility exports",
         handler: async (ctx) => {
             const args = ctx.args;
-            const scopes = args.local || args.global ? [normalizeScope(args)] : ["local", "global"];
+            const scopes = args.local || args.global
+                ? [normalizeScope(args)]
+                : ["local", "global"];
             const dryRun = Boolean(args.dryRun);
             for (const scope of scopes) {
                 const removed = await pruneInstall(scope, dryRun);
-                console.log(`${dryRun ? "[dry-run] " : ""}prune (${scope}): ${removed.length} removed`);
-                for (const removedPath of removed) {
-                    console.log(`  - ${removedPath}`);
-                }
+                emitLoggerLines(ctx.logger, [
+                    `${dryRun ? "[dry-run] " : ""}prune (${scope}): ${removed.length} removed`,
+                    ...removed.map((removedPath) => `  - ${removedPath}`),
+                ]);
             }
         },
     });
@@ -540,14 +553,16 @@ function createCleanParser() {
         description: "Remove stale tool-owned residue and dangling links",
         handler: async (ctx) => {
             const args = ctx.args;
-            const scopes = args.local || args.global ? [normalizeScope(args)] : ["local", "global"];
+            const scopes = args.local || args.global
+                ? [normalizeScope(args)]
+                : ["local", "global"];
             const dryRun = Boolean(args.dryRun);
             for (const scope of scopes) {
                 const removed = await cleanInstall(scope, dryRun);
-                console.log(`${dryRun ? "[dry-run] " : ""}clean (${scope}): ${removed.length} removed`);
-                for (const removedPath of removed) {
-                    console.log(`  - ${removedPath}`);
-                }
+                emitLoggerLines(ctx.logger, [
+                    `${dryRun ? "[dry-run] " : ""}clean (${scope}): ${removed.length} removed`,
+                    ...removed.map((removedPath) => `  - ${removedPath}`),
+                ]);
             }
         },
     });
@@ -589,7 +604,10 @@ function registerMcpTools(parser, policy) {
         ],
         handler: async (value) => {
             const args = unwrapToolArgs(value);
-            const results = await withResolvedSourceSkills(async (skills) => searchCatalogSkills(skills, args.query, { limit: args.limit, policy }));
+            const results = searchCatalogSkills(SOURCE_SKILL_INDEX, args.query, {
+                limit: args.limit,
+                policy,
+            });
             return {
                 items: results.map((result) => ({
                     name: result.skill.name,
@@ -704,6 +722,73 @@ function registerMcpTools(parser, policy) {
         },
     });
 }
+const SUBCOMMAND_DEFINITIONS = [
+    {
+        name: "install",
+        description: "Install or reconcile a source skill",
+        createParser: createInstallParser,
+    },
+    {
+        name: "list",
+        description: "List source skills with descriptions",
+        createParser: createListParser,
+    },
+    {
+        name: "find",
+        description: "Find relevant source skills for free-text requests",
+        createParser: createFindParser,
+    },
+    {
+        name: "use",
+        description: "Run a source skill without installing it",
+        createParser: createUseParser,
+    },
+    {
+        name: "run",
+        description: "Execute an installed or runnable skill command",
+        createParser: createRunParser,
+    },
+    {
+        name: "validate",
+        description: "Validate installed skills",
+        createParser: createValidateParser,
+    },
+    {
+        name: "update",
+        description: "Update source skills",
+        createParser: createUpdateParser,
+    },
+    {
+        name: "uninstall",
+        description: "Remove installed skill state",
+        createParser: createUninstallParser,
+    },
+    {
+        name: "prune",
+        description: "Remove dangling links and exports",
+        createParser: createPruneParser,
+    },
+    {
+        name: "reset",
+        description: "Rebuild links and runtime for an installed skill",
+        createParser: createResetParser,
+    },
+    {
+        name: "clean",
+        description: "Remove stale tool-owned residue",
+        createParser: createCleanParser,
+    },
+    {
+        name: "purge",
+        description: "Remove installed state and declared external files",
+        createParser: createPurgeParser,
+    },
+    {
+        name: "print-mcp-config",
+        description: "Print a JSON-only MCP config snippet",
+        createParser: createPrintMcpConfigParser,
+    },
+];
 function addSubCommand(parser, name, description, commandParser) {
     parser.addSubCommand({
         name,
@@ -731,19 +816,9 @@ export function createRootParser(rawArgv = process.argv.slice(2)) {
     }));
     addSkillPolicyFlags(parser);
     registerMcpTools(parser, policy);
-    addSubCommand(parser, "install", "Install or reconcile a source skill", createInstallParser());
-    addSubCommand(parser, "list", "List source skills with descriptions", createListParser());
-    addSubCommand(parser, "find", "Find relevant source skills for free-text requests", createFindParser());
-    addSubCommand(parser, "use", "Run a source skill without installing it", createUseParser());
-    addSubCommand(parser, "run", "Execute an installed or runnable skill command", createRunParser());
-    addSubCommand(parser, "validate", "Validate installed skills", createValidateParser());
-    addSubCommand(parser, "update", "Update source skills", createUpdateParser());
-    addSubCommand(parser, "uninstall", "Remove installed skill state", createUninstallParser());
-    addSubCommand(parser, "prune", "Remove dangling links and exports", createPruneParser());
-    addSubCommand(parser, "reset", "Rebuild links and runtime for an installed skill", createResetParser());
-    addSubCommand(parser, "clean", "Remove stale tool-owned residue", createCleanParser());
-    addSubCommand(parser, "purge", "Remove installed state and declared external files", createPurgeParser());
-    addSubCommand(parser, "print-mcp-config", "Print a JSON-only MCP config snippet", createPrintMcpConfigParser());
+    for (const definition of SUBCOMMAND_DEFINITIONS) {
+        addSubCommand(parser, definition.name, definition.description, definition.createParser());
+    }
     return parser;
 }
 function isFlag(value) {
@@ -763,7 +838,11 @@ function injectFindQuery(argv) {
     if (firstFlagIndex === -1) {
         return ["--query", argv.join(" ")];
     }
-    return ["--query", argv.slice(0, firstFlagIndex).join(" "), ...argv.slice(firstFlagIndex)];
+    return [
+        "--query",
+        argv.slice(0, firstFlagIndex).join(" "),
+        ...argv.slice(firstFlagIndex),
+    ];
 }
 function injectCommandInvocation(argv) {
     if (argv.length < 2 || isFlag(argv[0])) {
@@ -799,14 +878,33 @@ export function normalizeCliArgv(argv) {
             return argv;
     }
 }
+const HELP_FLAGS = new Set(["--help", "-h"]);
+async function tryParseSubcommandHelp(rawArgv) {
+    const [commandName, ...rest] = rawArgv;
+    if (!commandName || isFlag(commandName) || !rest.some((value) => HELP_FLAGS.has(value))) {
+        return false;
+    }
+    const definition = SUBCOMMAND_DEFINITIONS.find((candidate) => candidate.name === commandName);
+    if (!definition) {
+        return false;
+    }
+    // ArgParser handles --help before subcommand resolution, so route directly to the
+    // sub-parser to preserve command-specific auto-help without reviving custom required-flag logic.
+    await definition.createParser().parse(["--help"]);
+    return true;
+}
 async function main() {
     const rawArgv = process.argv.slice(2);
+    if (await tryParseSubcommandHelp(rawArgv)) {
+        return;
+    }
     const parser = createRootParser(rawArgv);
     await parser.parse(normalizeCliArgv(rawArgv));
 }
-if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+if (process.argv[1] &&
+    import.meta.url === pathToFileURL(process.argv[1]).href) {
     main().catch((error) => {
-        console.error(error instanceof Error ? error.message : String(error));
+        process.stderr.write(`${error instanceof Error ? error.message : String(error)}\n`);
         process.exit(1);
     });
 }

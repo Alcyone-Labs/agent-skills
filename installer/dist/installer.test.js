@@ -9,12 +9,13 @@ import { createRootParser } from "./installer.js";
 import { createSkill, pathExists } from "./core/test-helpers.test.js";
 const distDir = dirname(fileURLToPath(import.meta.url));
 const cliPath = join(distDir, "installer.js");
-function runCli(args, cwd, homeDir) {
+function runCli(args, cwd, homeDir, envOverrides = {}) {
     return spawnSync(process.execPath, [cliPath, ...args], {
         cwd,
         env: {
             ...process.env,
             HOME: homeDir,
+            ...envOverrides,
         },
         encoding: "utf-8",
     });
@@ -34,54 +35,53 @@ test("installer CLI parses positional install args with arg-parser v3", async ()
         await rm(workspace, { recursive: true, force: true });
     }
 });
-test("installer CLI auto-help lists the new commands", async () => {
+test("installer CLI auto-help lists the new commands and subcommand help", async () => {
     const workspace = await mkdtemp(join(tmpdir(), "agent-skills-help-"));
     const homeDir = join(workspace, "home");
     try {
-        const result = runCli(["--help"], workspace, homeDir);
-        assert.equal(result.status, 0, result.stderr);
-        assert.match(result.stdout, /Usage:\s+agent-skills/);
-        assert.match(result.stdout, /list\s+List source skills with descriptions/);
-        assert.match(result.stdout, /find\s+Find relevant source skills/);
-        assert.match(result.stdout, /use\s+Run a source skill without installing it/);
-        assert.match(result.stdout, /print-mcp-config\s+Print a JSON-only MCP config snippet/);
+        const rootHelp = runCli(["--help"], workspace, homeDir);
+        const useHelp = runCli(["use", "--help"], workspace, homeDir);
+        assert.equal(rootHelp.status, 0, rootHelp.stderr);
+        assert.match(rootHelp.stdout, /Usage:\s+agent-skills/);
+        assert.match(rootHelp.stdout, /list\s+List source skills with descriptions/);
+        assert.match(rootHelp.stdout, /find\s+Find relevant source skills/);
+        assert.match(rootHelp.stdout, /use\s+Run a source skill without installing it/);
+        assert.match(rootHelp.stdout, /print-mcp-config\s+Print a JSON-only MCP config snippet/);
+        assert.equal(useHelp.status, 0, useHelp.stderr);
+        assert.match(useHelp.stdout, /Usage:\s+agent-skills use/);
+        assert.match(useHelp.stdout, /--skill, -s\s+Skill name \*/);
+        assert.match(useHelp.stdout, /--command\s+Exported command name \*/);
     }
     finally {
         await rm(workspace, { recursive: true, force: true });
     }
 });
-test("installer CLI list shows source skill descriptions", async () => {
+test("installer CLI list uses the packaged source catalog outside the source repo", async () => {
     const workspace = await mkdtemp(join(tmpdir(), "agent-skills-list-"));
     const homeDir = join(workspace, "home");
     try {
-        await createSkill(join(workspace, "skills"), "demo", {
-            description: "Demo source skill description.",
-        });
-        const result = runCli(["list"], workspace, homeDir);
+        const result = runCli(["list"], workspace, homeDir, { PATH: "" });
         assert.equal(result.status, 0, result.stderr);
-        assert.match(result.stdout, /demo\n\s+Demo source skill description\./);
+        assert.match(result.stdout, /arg-parser/);
+        assert.match(result.stdout, /Type-safe CLI argument parser with MCP integration/);
+        assert.doesNotMatch(result.stderr, /Failed to fetch skills from GitHub/);
     }
     finally {
         await rm(workspace, { recursive: true, force: true });
     }
 });
-test("installer CLI find ranks relevant skills from free text", async () => {
+test("installer CLI find uses packaged BM25 search and renders colored results", async () => {
     const workspace = await mkdtemp(join(tmpdir(), "agent-skills-find-"));
     const homeDir = join(workspace, "home");
     try {
-        const skillsRoot = join(workspace, "skills");
-        await createSkill(skillsRoot, "browser-demo", {
-            description: "Browser markdown extraction and semantic tree capture.",
-            commandNames: ["browser-fetch"],
+        const result = runCli(["find", "jazz", "service", "worker", "--limit", "3"], workspace, homeDir, {
+            FORCE_COLOR: "1",
+            PATH: "",
         });
-        await createSkill(skillsRoot, "search-demo", {
-            description: "General web search and company lookup.",
-            commandNames: ["search-web"],
-        });
-        const result = runCli(["find", "browser", "markdown", "--limit", "2"], workspace, homeDir);
         assert.equal(result.status, 0, result.stderr);
-        assert.match(result.stdout, /1\. browser-demo\n\s+Browser markdown extraction and semantic tree capture\./);
-        assert.match(result.stdout, /Why: /);
+        assert.match(result.stdout, /sauve-jazz-extension|jazz-runtime-wasm-compat/);
+        assert.match(result.stdout, /Why:/);
+        assert.match(result.stdout, /\u001b\[[0-9;]*m/);
     }
     finally {
         await rm(workspace, { recursive: true, force: true });
@@ -202,7 +202,14 @@ test("installer MCP tools expose only find use install and enforce policy", asyn
                 },
             }, null, 2),
         });
-        const parser = createRootParser(["--allow-skill", "allowed", "--deny-skill", "blocked"]);
+        const parser = createRootParser([
+            "--allow-skill",
+            "chrome-extension-architect",
+            "--allow-skill",
+            "allowed",
+            "--deny-skill",
+            "blocked",
+        ]);
         const tools = parser.toMcpTools({
             includeSubCommands: false,
         });
@@ -210,8 +217,10 @@ test("installer MCP tools expose only find use install and enforce policy", asyn
         const findTool = tools.find((tool) => tool.name === "find");
         const useTool = tools.find((tool) => tool.name === "use");
         assert.ok(findTool && useTool);
-        const findResult = await findTool.execute({ query: "browser skill" });
-        assert.deepEqual(findResult.items.map((item) => item.name), ["allowed"]);
+        const findResult = await findTool.execute({ query: "service worker" });
+        assert.deepEqual(findResult.items.map((item) => item.name), [
+            "chrome-extension-architect",
+        ]);
         const useResult = await useTool.execute({
             skill: "allowed",
             command: "allowed-cmd",

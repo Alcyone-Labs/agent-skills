@@ -173,6 +173,13 @@ export interface SkillCatalogEntry {
   source: SkillSource;
 }
 
+export interface SourceSkillIndexEntry extends SkillCatalogEntry {
+  /**
+   * Normalized markdown body text used only for packaged metadata search.
+   */
+  searchText: string;
+}
+
 export interface SkillAccessPolicy {
   allowSkills?: string[];
   denySkills?: string[];
